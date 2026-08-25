@@ -1,0 +1,216 @@
+---
+title: "Make df combining cnb/prl/lesions/structural data (CNB paper subset)"
+author: "Erica Baller"
+date: "2026-08-21"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(stringr)
+homedir <- "~/Library/CloudStorage/Box-Box/BBL/ms_cnb_20260821/for_elizabeth/"
+```
+#Pre: CNB, PRL, Lesion volume, mrn->empi, mrn->bblid mapping files
+#Post: Deidentified dataframe containing only the columns needed for
+#      cnb_lesion_structural_prl_final_analyses_pre_replication_20260818.Rmd (raw CNB
+#      task columns for kosha z-scoring, lesion count/volume, GM/WM/CSF/total/ICV
+#      volumes, thalamic volume, PRL count/volume, plus bblid/age/gender/QA columns).
+#Uses: We will be bringing together a lot of files to make a master spreadsheet that can be used across many analyses. What is really important is that we combine separately so we protect patient data, and then create a deidentified dataset to save and use in other analyses.
+#Dependencies: any R will do
+
+##CNB
+```{r}
+# Read in CNB data
+cnb_data_v1 <- read.csv(paste0(homedir, "data/cnb_v1_20260202.csv"), sep = ",", header = TRUE)
+cnb_data_v2 <- read.csv(paste0(homedir, "data/cnb_v2_20260202.csv"), sep = ",", header = TRUE)
+cnb_data_v3 <- read.csv(paste0(homedir, "data/cnb_v3_20260202.csv"), sep = ",", header = TRUE)
+
+#combined_final <- rbind(cnb_data_v1, cnb_data_v2)
+cnb_data <- rbind(cnb_data_v1, cnb_data_v2, cnb_data_v3)
+
+# Remove practice trials and reset the rows
+cnb_data <- cnb_data[-c(1, 23, 90, 120), ]
+rownames(cnb_data) <- NULL #n=128
+
+names(cnb_data)[names(cnb_data) == "test_sessions.subid"] <- "bblid"
+
+
+#clean
+cnb_data <- cnb_data %>%
+   arrange(bblid, test_sessions_v.dotest) %>%
+   distinct(bblid, .keep_all = TRUE)#n=127
+
+names(cnb_data) <- gsub(x=names(cnb_data), pattern = "\\PCET_A\\.", replacement = "PCET\\.")
+```
+
+## PRL
+```{r}
+### read in prl data
+cnb_and_prl <- read.csv(paste0(homedir, "data/cnb_and_7t_list_2026-mks.csv"), sep = ",", header = TRUE) #n=30
+prl_data <- cnb_and_prl %>% filter(!is.na(prl.count)) #n=27
+```
+
+## Lesion volumes
+```{r}
+#read in mimosa volume data
+lesion_volume_df <- read.csv(paste0(homedir, "data/mimosa_volume_values_n105_20260702_094134.csv"), header = T, sep = ",")
+```
+
+## Lesion count
+```{r}
+#read in mimosa volume data
+lesion_count_df <- read.csv(paste0(homedir, "data/lesion_count_n104.csv"), header = T, sep = ",")
+```
+
+## fast segmentation
+```{r}
+#read in fast data
+fast_volumes <- read.csv(paste0(homedir, "data/total_fast_brain_volumes_n104.csv"), header = T, sep = ",")
+
+fast_df <- fast_volumes %>%
+  mutate(intracranial_volume = csf_volume + gm_volume + wm_volume,
+         gm_by_icv = gm_volume/intracranial_volume,
+         wm_by_icv = wm_volume/intracranial_volume)
+```
+
+## segmentation volumes
+```{r}
+#read in openmap-t1 segmentations
+#when I first ran the openmap, I had accidentally labeled empi as subject and exam data as session. I ahve changed the script but have not rerun anything. Once this is run from scratch, would just get rid of the rename line
+
+segmentations <- read.csv(paste0(homedir, "data/all_volumes_n105_from_openmap_t1.csv"), header = T, sep = ",") #n=105
+segmentations <- rename(segmentations, "EMPI" = "subject", "EXAM_DATE" = "session") ###CHANGE THIS ONCE THIS IS RERUN WITH NEW SCRIPT
+segmentations$Thalamus_total <- (segmentations$Thalamus_L + segmentations$Thalamus_R)
+
+
+names(segmentations) <- ifelse(names(segmentations) %in% c("EMPI", "EXAM_DATE"),
+                                names(segmentations),
+                                paste0(names(segmentations), "_openmap_seg"))
+```
+
+## Conversion files (MRN->EMPI, MRN-> BBLID
+```{r}
+#read in mrn to bblid
+mrn_to_bblid <- read.csv(paste0(homedir, "data/mrn_to_bblid.csv"), sep = ",", header = TRUE)
+
+#make lowercase for merging
+names(mrn_to_bblid)[names(mrn_to_bblid) == "BBLID"] <- "bblid"
+
+#read mrn to empi
+mrn_to_empi <- read.csv(paste0(homedir, "data/name_mrn_empi.csv"), sep = ",", header = TRUE)
+
+```
+
+#Combine
+##Combine conversion files
+```{r}
+#remove leading zeros
+mrn_to_bblid$MRN_clean <- str_remove(as.character(mrn_to_bblid$MRN), "^0+")
+mrn_to_empi$MRN_clean  <- str_remove(as.character(mrn_to_empi$MRN),  "^0+")
+
+mrn_empi_bblid_merged <- merge(mrn_to_bblid, mrn_to_empi, by = "MRN_clean")
+
+#drop names
+mrn_empi_bblid <- mrn_empi_bblid_merged %>% select(EMPI, MRN_clean, bblid)
+```
+
+## Combine behavioral data
+```{r}
+cnb_data_empi <- merge(cnb_data, mrn_empi_bblid, by = "bblid") #n=124
+names(cnb_data_empi)[names(cnb_data_empi) == "MRN_clean"] <- "MRN"
+```
+
+## Combine PRL data
+```{r}
+#merge bblid and mrn to prl data, n=27
+#prl_with_bblid <- merge(prl_data, mrn_empi_bblid, by.x = "MRN", by.y = "MRN_clean", all.x = TRUE) #%>%
+  #select(bblid, prl.count, prl.volume..mm3., COMPLETED.CNB., DATE.COMPLETED.CNB, Closest.7T.scan)
+
+prl_data$MRN <- str_remove(as.character(prl_data$MRN), "^0+")
+cnb_prl_data <- merge(cnb_data_empi, prl_data, by = "MRN", all.x = TRUE)  #n=124
+
+```
+
+## Combine imaging data (mimosa volumes, counts, segmentations) with rest of data
+```{r}
+cnb_prl_lesion_data <- merge(cnb_prl_data, lesion_volume_df, by = "EMPI", all.x = TRUE) #n=125
+
+# merge on EMPI + EXAM_DATE (not just EMPI) since fast_df also carries its own EXAM_DATE
+# column -- merging on EMPI alone would silently rename both to EXAM_DATE.x/EXAM_DATE.y
+# instead of keeping a single column for the later segmentations merge to key on
+cnb_prl_lesion_volumes_data <- merge(cnb_prl_lesion_data, fast_df, by = c("EMPI", "EXAM_DATE"), all.x = TRUE) #n=125
+
+cnb_prl_lesion_volumes_counts_data <- merge(cnb_prl_lesion_volumes_data, lesion_count_df, by = "EMPI", all.x = TRUE) #n=125
+
+cnb_prl_lesion_volumes_segs_data <- merge(cnb_prl_lesion_volumes_counts_data, segmentations, by = c("EMPI", "EXAM_DATE"), all.x = TRUE) #n=125
+
+#make thalamus by ICV column
+cnb_prl_lesion_volumes_segs_data$Thalamus_total_by_icv <- cnb_prl_lesion_volumes_segs_data$Thalamus_total_openmap_seg/cnb_prl_lesion_volumes_segs_data$intracranial_volume
+
+# 23 people don't have mimosa lesions, while 21 don't have a count -- the count for
+# someone with no lesions is 0, not missing, so lesion_count only gets NA'd out when
+# there's no lesion volume at all (i.e. the scan/segmentation itself is missing)
+combined_final <- cnb_prl_lesion_volumes_segs_data %>%
+  mutate(lesion_count = ifelse(is.na(volume_of_mimosa_lesions), NA, lesion_count))
+
+```
+
+
+
+#Cleaning
+ - specifically, after QA, some of the scans look bad (skull strip) or the transform looks very bizarre. Will make vectors of those that are unusable at the native space scan, and ones where warp is bad, add to data frame, and save
+```{r qa}
+
+#scans were eyeballed 6/26/2026
+#bad_scans_native_space <- c("1003024083", "1003553516", "1003731158", "8459090932", "8463547992", "8472631746", "8473414506", "8473706992")
+bad_scans_native_space <- c("")
+bad_warps <- c("8000066398","8000230354","100126757","8000037131","8443183371","8444330518","8451646764","8451738538","8466215076","8469129522","8472497932","8477618466","8451053490")
+
+combined_final$bad_scans_native_space <- ifelse(combined_final$EMPI %in% bad_scans_native_space, 1, 0)
+combined_final$bad_warps <- ifelse(combined_final$EMPI %in% bad_warps, 1, 0)
+
+```
+
+
+
+#De-identify and select CNB-paper columns
+Only the columns that
+cnb_lesion_structural_prl_final_analyses_pre_replication_20260818.Rmd actually reads:
+identifiers/covariates/QA flags, the raw CNB item columns needed for kosha z-scoring,
+lesion count/volume, GM/WM/CSF/total/ICV volumes, thalamic volume (raw + ICV-normalized),
+and PRL count/volume.
+```{r}
+cnb_paper_columns <- c(
+  # identifiers / covariates / QA
+  "bblid", "test_sessions_v.age", "test_sessions_v.gender",
+  "bad_scans_native_space", "bad_warps",
+  # raw CNB task columns (kosha norm z-scoring, see ms_tasks_kosha in the analysis script)
+  "ER40_A.ER40_CR", "ER40_A.ER40_RTCR",
+  "CPF_A.CPF_CR", "CPF_A.CPF_RTCR",
+  "MPRACT.MP2RTCR",
+  "LNB2_135.LNB2_PC", "LNB2_135.LNB2_MRTC",
+  "SPVRT_A.SPVRTA_PC", "SPVRT_A.SPVRTA_RTCR",
+  "PCET.PCET_ACC2", "PCET.PCET_RTCR",
+  "PCPTNL.CPT_TPR", "PCPTNL.CPT_TPRT",
+  "PMAT24_A.PMAT24_A_PC", "PMAT24_A.PMAT24_A_RTCR",
+  "CPW_A.CPW_CR", "CPW_A.CPW_RTCR",
+  "SVOLT_A.SVOLT_CR", "SVOLT_A.SVOLT_RTCR",
+  "VSPLOT15.VSPLOT15_PC", "VSPLOT15.VSPLOT15_RTCR",
+  "MEDF36_A.MEDF36A_PC", "MEDF36_A.MEDF36A_RTCR",
+  "SCTAP.SCTAP_TOT",
+  # lesion / structural volumes
+  "volume_of_mimosa_lesions", "lesion_count",
+  "csf_volume", "gm_volume", "wm_volume", "gm_by_icv", "wm_by_icv",
+  "total_volume", "intracranial_volume",
+  # thalamic volume
+  "Thalamus_total_openmap_seg", "Thalamus_total_by_icv",
+  # PRL
+  "prl.count", "prl.volume..mm3."
+)
+
+combined_deidentified <- combined_final %>%
+  select(all_of(cnb_paper_columns))
+
+write.csv(combined_deidentified, file = paste0(homedir, "data/cnb_prl_mimosa_struct_vol_deid.csv"))
+```

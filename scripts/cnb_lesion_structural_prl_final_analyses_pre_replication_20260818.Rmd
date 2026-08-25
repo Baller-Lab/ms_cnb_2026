@@ -1,0 +1,628 @@
+---
+title: "CNB Lesion/Structural/PRL Final Analyses (Pre-Replication)"
+author: "Erica Baller"
+date: "2026-08-18"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+<!--
+Pre: make_combined_spreadsheet_for_cnb_paper.Rmd -- reads that script's deidentified
+     output (cnb_prl_mimosa_struct_vol_deid.csv), which carries only the columns this
+     doc needs rather than the full combined spreadsheet from make_combined_spreadsheet.Rmd
+Post: renders the simplified cognitive domain summary table (lesion count/volume,
+      GM/WM volume, thalamic volume, PRL count/volume)
+Uses: pared-down extract of cnb_goa_prl_mimosa_streamline_filtering_deid_20260621.Rmd --
+      keeps only the chunks that "Cognitive Domain Summary Table (simplified)" actually
+      depends on (data read-in/cleaning, kosha z-scoring, cog_domains_imaging,
+      cog_imaging_results, prl_domain_results, thalamus_domain_results, the summary
+      table build). One deliberate trim within a kept chunk: the source doc's
+      cog_domain_summary_table chunk also builds and prints a *full* 12-column table
+      (col_names/cog_table_for_viewing) before narrowing to the simplified 7-column
+      view -- that full-table render is commented out (not deleted) at the end of the
+      cog_domain_summary_table chunk below, since it's not needed to produce the
+      simplified table but may be useful again later.
+Dependencies: Using Rstudio version Version 2024.12.0+467 (2024.12.0+467); R v 4.4.2
+-->
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tibble)
+library(purrr)
+library(broom)
+library(knitr)
+library(kableExtra)
+
+homedir <- "~/Library/CloudStorage/Box-Box/BBL/ms_cnb_20260821/for_elizabeth/"
+
+
+# shared helper functions (norming, item-level LMs, summary tables) -- same
+# source used by the full analysis doc, so results here stay consistent with it
+source(paste0(homedir, "scripts/msdep_prospective_functions.R"))
+```
+
+# ============================================================
+# COGNITIVE DOMAIN / IMAGING SETUP
+# ============================================================
+
+## Define cog names and domains
+```{r names_and_domains}
+
+#### ACC FOR EACH TASK
+acc_task_columns <- c("cpf_kosha_z_acc", "er40_kosha_z_acc", "lnb2_kosha_z_acc",
+                  "spvrt_kosha_z_acc", "pcet_kosha_z_acc", "pcptnl_kosha_z_acc",
+                  "pmat_kosha_z_acc", "cpw_kosha_z_acc", "svoltd_kosha_z_acc",
+                  "vsplot15_kosha_z_acc", "medf36a_kosha_z_acc", "sctap_kosha_z_acc")
+
+acc_task_columns_names <- c("Facial Memory", "Emotion Identification", "Working Memory",
+                            "Verbal Reasoning", "Abstraction", "Attention", "Nonverbal Reasoning",
+                            "Verbal Memory", "Spatial Memory", "Spatial Reasoning", "Emotion Differentiation",
+                            "Finger Taps")
+
+
+##### RT FOR EACH TASK
+rt_task_columns <- c("cpf_kosha_z_rt", "er40_kosha_z_rt","lnb2_kosha_z_rt",
+                  "spvrt_kosha_z_rt", "pcet_kosha_z_rt", "pcptnl_kosha_z_rt",
+                  "pmat_kosha_z_rt", "cpw_kosha_z_rt", "svoltd_kosha_z_rt",
+                  "vsplot15_kosha_z_rt", "medf36a_kosha_z_rt", "mpract_kosha_z_rt")
+
+rt_task_columns_names <- c("Facial Memory", "Emotion Identification","Working Memory",
+                            "Verbal Reasoning", "Abstraction", "Attention", "Nonverbal Reasoning",
+                            "Verbal Memory", "Spatial Memory", "Spatial Reasoning", "Emotion Differentiation",
+                            "Sensorimotor Speed")
+
+## acc domain columms
+ef_acc_task_columns <-c("pcet_kosha_z_acc", "pcptnl_kosha_z_acc", "lnb2_kosha_z_acc")
+cc_acc_task_columns <-c("vsplot15_kosha_z_acc", "spvrt_kosha_z_acc","pmat_kosha_z_acc")
+mem_acc_task_columns <-c("cpf_kosha_z_acc", "svoltd_kosha_z_acc", "cpw_kosha_z_acc")
+emo_acc_task_columns <- c("medf36a_kosha_z_acc", "er40_kosha_z_acc")
+
+
+#rt domain columns
+ef_rt_task_columns <-c("pcet_kosha_z_rt", "pcptnl_kosha_z_rt", "lnb2_kosha_z_rt")
+cc_rt_task_columns <-c("vsplot15_kosha_z_rt", "spvrt_kosha_z_rt", "pmat_kosha_z_rt")
+mem_rt_task_columns <-c("cpf_kosha_z_rt", "svoltd_kosha_z_rt", "cpw_kosha_z_rt")
+emo_rt_task_columns <- c("medf36a_kosha_z_rt","er40_kosha_z_rt")
+
+## cognitive domain labels
+domain_labels <- c(
+  ef_acc  = "EF Accuracy",
+  cc_acc  = "CC Accuracy",
+  mem_acc = "Memory Accuracy",
+  emo_acc = "Emotion Accuracy",
+  ef_rt   = "EF RT",
+  cc_rt   = "CC RT",
+  mem_rt  = "Memory RT",
+  emo_rt  = "Emotion RT"
+)
+
+```
+
+## Outcomes and Predictors
+```{r outcomes_and_predictors}
+## For analyses
+cog_outcomes <- c("ef_acc", "cc_acc", "mem_acc", "emo_acc",
+                  "ef_rt",  "cc_rt",  "mem_rt",  "emo_rt")
+
+imaging_predictors <- c(
+  "volume_of_mimosa_lesions",   # total lesion volume from mimosa
+  "lesion_count",               # number of lesions
+  "csf_volume",                 # CSF volume
+  "gm_volume",                  # grey matter volume
+  "wm_volume",                  # white matter volume
+  "gm_by_icv",                  # grey matter volume / intracranial volume
+  "wm_by_icv",                  # white matter volume / intracranial volume
+  "total_volume"                # total brain volume
+)
+```
+
+## Prep for making the imaging table
+```{r prep_making_imaging_table}
+
+# Predictors that get intracranial_volume added as a covariate, regardless of which
+# outcome (cognitive, depression, anxiety, ...) they're being run against. Applies
+# automatically per-predictor inside run_item_imaging_lm/run_item_imaging_lm_by_group
+# and the hand-rolled cog_imaging_results* blocks below -- everything else (lesion
+# count/volume, total_volume, the already-ICV-normalized gm_by_icv/wm_by_icv/
+# Thalamus_total_by_icv, PRL measures) never gets ICV.
+icv_covariate_predictors <- c("gm_volume", "wm_volume", "csf_volume", "Thalamus_total_openmap_seg")
+
+```
+
+
+# ============================================================
+# DATA READ IN and Z-SCORE CALCULATION
+# ============================================================
+
+
+```{r read_deid_spreadsheet}
+combined_final <- read.csv(paste0(homedir, "data/cnb_prl_mimosa_struct_vol_deid.csv"), sep = ",", header = T)
+
+```
+
+# Apply scan quality filters
+```{r scan_quality_filters}
+# PRL columns: no filter (all participants)
+# Lesion count, lesion volume, T1 volumetrics: bad_scans_native_space == 0
+native_space_cols <- c("volume_of_mimosa_lesions", "lesion_count",
+                       "csf_volume", "gm_volume", "wm_volume", "gm_by_icv", "wm_by_icv", "total_volume",
+                       "Thalamus_total_openmap_seg", "Thalamus_total_by_icv")
+combined_final <- combined_final %>%
+  mutate(across(all_of(native_space_cols),
+                ~ ifelse(bad_scans_native_space != 0, NA_real_, .)))
+
+#being mindful that there are individuals who didn't have a full set or mimosa failed and so numbers change
+
+cat("Total participants:", nrow(combined_final), "\n")
+cat("bad_scans_native_space == 0:", sum(combined_final$bad_scans_native_space == 0, na.rm = TRUE), "\n")
+cat("bad_scans_native_space == 0 & bad_warps == 0:",
+    sum(combined_final$bad_scans_native_space == 0 & combined_final$bad_warps == 0, na.rm = TRUE), "\n")
+cat("PRL participants (prl.count not NA):", sum(!is.na(combined_final$prl.count)), "\n")
+```
+
+# NORMS
+## Read in norms
+```{r read_in_kosha_norms}
+#read in norms by age
+cnb_norms_from_kosha <- read.csv(paste0(homedir, "/data/cnb_norm_data.csv"), header = T, sep = ",", fileEncoding = "UTF-8-BOM")
+
+```
+
+## Z-score calculations
+```{r r_ms_z_scores_kosha}
+# Define the task list - COLUMNS CHANGED TO MATCH
+ms_tasks_kosha <- list(
+  er40 = c("ER40_A.ER40_CR", "ER40_A.ER40_RTCR"),
+  cpf = c("CPF_A.CPF_CR", "CPF_A.CPF_RTCR"),
+ # cpfd = c("CPFD_A.CPFD_CR", "CPFD_A.CPFD_TPRT"),
+  mpract = c("MPRACT.MP2RTCR", "MPRACT.MP2RTCR"), #IGNORE ACCURACY
+  lnb2 = c("LNB2_135.LNB2_PC", "LNB2_135.LNB2_MRTC"),
+  spvrt = c("SPVRT_A.SPVRTA_PC", "SPVRT_A.SPVRTA_RTCR"),
+  pcet = c("PCET.PCET_ACC2", "PCET.PCET_RTCR"),
+  pcptnl = c("PCPTNL.CPT_TPR", "PCPTNL.CPT_TPRT"),
+  pmat = c("PMAT24_A.PMAT24_A_PC", "PMAT24_A.PMAT24_A_RTCR"),
+  cpw = c("CPW_A.CPW_CR", "CPW_A.CPW_RTCR"),
+#  cpwd = c("CPWD_A.CPWD_CR", "CPWD_A.CPWD_W_RTCR"),
+  svoltd = c("SVOLT_A.SVOLT_CR", "SVOLT_A.SVOLT_RTCR"),
+  vsplot15 = c("VSPLOT15.VSPLOT15_PC", "VSPLOT15.VSPLOT15_RTCR"),
+  medf36a = c("MEDF36_A.MEDF36A_PC","MEDF36_A.MEDF36A_RTCR"),
+  sctap = c("SCTAP.SCTAP_TOT", "SCTAP.SCTAP_TOT") #IGNORE RT
+
+)
+
+
+for (task in names(ms_tasks_kosha)) {
+
+  cnb_accuracy_col <- ms_tasks_kosha[[task]][1]   # Accuracy column name
+  cnb_reaction_time_col <- ms_tasks_kosha[[task]][2]   # Reaction time column name
+  print(task)
+
+
+      # Compute z-scores using norm-based approach
+  combined_final[[paste0(task, "_kosha_z_acc")]] <- zscores_kosha_norms(data_frame = combined_final, norm_column_name = cnb_accuracy_col, acc_or_rt = "acc", cnb_column_name = cnb_accuracy_col, norm_df = cnb_norms_from_kosha)
+
+  #multiply RT by -1 so negative scores mean slower time
+    combined_final[[paste0(task, "_kosha_z_rt")]] <- (zscores_kosha_norms(data_frame = combined_final, norm_column_name = cnb_reaction_time_col,  acc_or_rt = "rt", cnb_column_name = cnb_reaction_time_col, norm_df = cnb_norms_from_kosha))* -1
+}
+
+
+```
+
+# Compute cog domains on combined_final
+```{r cog_domains_with_imaging}
+cog_domains_imaging <- combined_final %>%
+  mutate(
+    mean_acc_z = rowMeans(across(all_of(acc_task_columns)), na.rm = TRUE),
+    mean_rt_z  = rowMeans(across(all_of(rt_task_columns)),  na.rm = TRUE),
+    ef_acc  = rowMeans(across(all_of(ef_acc_task_columns)),  na.rm = TRUE),
+    cc_acc  = rowMeans(across(all_of(cc_acc_task_columns)),  na.rm = TRUE),
+    mem_acc = rowMeans(across(all_of(mem_acc_task_columns)), na.rm = TRUE),
+    emo_acc = rowMeans(across(all_of(emo_acc_task_columns)), na.rm = TRUE),
+    ef_rt   = rowMeans(across(all_of(ef_rt_task_columns)),   na.rm = TRUE),
+    cc_rt   = rowMeans(across(all_of(cc_rt_task_columns)),   na.rm = TRUE),
+    mem_rt  = rowMeans(across(all_of(mem_rt_task_columns)),  na.rm = TRUE),
+    emo_rt  = rowMeans(across(all_of(emo_rt_task_columns)),  na.rm = TRUE)
+  )
+
+```
+
+
+# ============================================================
+# COGNITIVE ANALYSES 
+# ============================================================
+## Total ACC and RT across all tasks
+
+Overall (not per-domain) summary of mean Accuracy vs mean RT, on the same per-subject
+`cog_domains_imaging$mean_acc_z`/`$mean_rt_z` used above, via `run_one_sample_t()` so
+the bar/CI are self-consistent the same way the domain plots are. This is a two-bar
+descriptive summary, not part of the 8-test FDR family above, so no significance
+testing/stars here -- just the mean and its 95% CI. Title dropped (per journal figure
+convention -- the description belongs in the manuscript's figure legend, not baked
+into the image).
+```{r}
+overall_acc_rt_data <- bind_rows(
+  run_one_sample_t(cog_domains_imaging$mean_acc_z, label = "mean_acc_z") %>% mutate(Metric = "Accuracy"),
+  run_one_sample_t(cog_domains_imaging$mean_rt_z,  label = "mean_rt_z")  %>% mutate(Metric = "Response Time")
+) %>%
+  mutate(
+    total_mean_z_score = mean_z,
+    total_se = sd_z / sqrt(n),
+    ci95_half_width = qt(0.975, df) * total_se
+  )
+
+overall_acc_rt_data
+
+overall_acc_rt_ylim <- c(
+  min(overall_acc_rt_data$total_mean_z_score - overall_acc_rt_data$ci95_half_width) - 0.1,
+  max(overall_acc_rt_data$total_mean_z_score + overall_acc_rt_data$ci95_half_width) + 0.1
+)
+
+total_mean_plot <- ggplot(overall_acc_rt_data, aes(x = Metric, y = total_mean_z_score, fill = Metric)) +
+  geom_bar(stat = "identity", width = 0.7) +
+  geom_errorbar(aes(ymin = total_mean_z_score - ci95_half_width, ymax = total_mean_z_score + ci95_half_width),
+                position = position_dodge(width = 0.6), width = 0.2, linewidth = 0.7) +
+  labs(y = "Mean z-score (+/- 95% C.I.)", x = "Metric") +
+  theme_classic() +
+  theme(
+    axis.text.x = element_text(angle = 0, hjust = 0.5, size = 14, color = "black"),
+    axis.text.y = element_text(size = 11, color = "black"),
+    axis.title.x = element_blank(),
+    axis.title.y = element_text(size = 14, margin = margin(r = 10)),
+    legend.position = "none",
+    axis.text = element_text(size = 14, color = "black"),
+    axis.line = element_line(size = 1),
+    panel.background = element_rect(color = "white"),
+    panel.grid = element_blank()
+  ) +
+  scale_y_continuous(limits = overall_acc_rt_ylim) +
+  scale_fill_manual(values = c("Accuracy" = "#5A80C7", "Response Time" = "goldenrod1"))
+
+# Print the plot
+total_mean_plot
+
+# Suggested manuscript figure legend:
+#   "Overall cognitive performance across all tasks. Bar plot shows the mean z score
+#    (+/- 95% confidence interval) for accuracy and response time, averaged across all
+#    cognitive tasks, in the total imaged cohort (n = 124). Error bars represent 95%
+#    confidence intervals."
+
+# Save the plot
+ggsave(paste0(homedir, "results/total_mean_plot.pdf"), plot = total_mean_plot, height = 6, width = 5)
+
+
+```
+
+## Cognitive domain behavioral analyses
+
+### Compute per-domain accuracy/RT one-sample t-tests
+
+One-sample t-test (mean vs 0) per domain x metric, run on the same per-subject domain
+z-scores used everywhere else in this doc (`cog_domains_imaging$ef_acc`, `$ef_rt`, etc.
+-- the `run_item_imaging_lm` outcomes/`cog_outcomes` from earlier), via the shared
+`run_one_sample_t()` helper. All 8 domain x metric tests are shown together on one
+figure, so their p-values are FDR-corrected as a single family (same convention as the
+imaging tables above) -- `fdr_sig` marks p_fdr < 0.05.
+
+Error bars are the t-distribution 95% CI (`mean +/- qt(0.975, df) * SEM`, using the
+same `df` as the one-sample t-test itself, so it's the same CI `t.test()` would report)
+rather than raw SEM -- JAMA's figure guidance calls for 95% CI error bars over SEM/SD,
+labeled as such on the axis. Note the CI and the FDR star answer different questions:
+a CI excluding zero is "significant, uncorrected p<.05"; the star is the FDR-corrected
+result across all 8 tests -- keeping both is intentional, not redundant.
+```{r domain_acc_rt_data}
+domain_metric_outcomes <- list(
+  `Executive Function` = list(Accuracy = "ef_acc",  `Response Time` = "ef_rt"),
+  `Complex Cognition`     = list(Accuracy = "cc_acc",  `Response Time` = "cc_rt"),
+  Memory                  = list(Accuracy = "mem_acc", `Response Time` = "mem_rt"),
+  Emotion                 = list(Accuracy = "emo_acc", `Response Time` = "emo_rt")
+)
+
+domain_acc_rt_data <- map_dfr(names(domain_metric_outcomes), function(domain) {
+  map_dfr(names(domain_metric_outcomes[[domain]]), function(metric) {
+    outcome_col <- domain_metric_outcomes[[domain]][[metric]]
+    run_one_sample_t(cog_domains_imaging[[outcome_col]], label = outcome_col) %>%
+      mutate(Domain = domain, Metric = metric)
+  })
+}) %>%
+  mutate(
+    p_fdr   = p.adjust(p, method = "fdr"),
+    fdr_sig = ifelse(p_fdr < 0.05, "*", ""),
+    total_mean_z_score = mean_z,
+    total_se = sd_z / sqrt(n),
+    ci95_half_width = qt(0.975, df) * total_se,
+    star_y = ifelse(total_mean_z_score >= 0,
+                     total_mean_z_score + ci95_half_width + 0.18,
+                     total_mean_z_score - ci95_half_width - 0.18)
+  )
+
+domain_acc_rt_data
+```
+
+### Build and combine the 4 domain plots
+
+Shared y-axis limits (computed from the actual data, including room for the
+significance stars, with a little padding) so all four panels are directly comparable
+on the same figure instead of each autoscaling to its own domain.
+```{r domain_acc_rt_plots}
+y_pad <- 0.15
+domain_acc_rt_ylim <- c(
+  min(c(domain_acc_rt_data$total_mean_z_score - domain_acc_rt_data$ci95_half_width, domain_acc_rt_data$star_y)) - y_pad,
+  max(c(domain_acc_rt_data$total_mean_z_score + domain_acc_rt_data$ci95_half_width, domain_acc_rt_data$star_y)) + y_pad
+)
+
+make_domain_acc_rt_plot <- function(domain_label) {
+  ggplot(domain_acc_rt_data %>% filter(Domain == domain_label),
+         aes(x = Metric, y = total_mean_z_score, fill = Metric)) +
+    geom_bar(stat = "identity", width = 0.7) +
+    geom_errorbar(aes(ymin = total_mean_z_score - ci95_half_width, ymax = total_mean_z_score + ci95_half_width),
+                  position = position_dodge(width = 0.6), width = 0.2, linewidth = 0.7) +
+    geom_text(aes(label = fdr_sig, y = star_y), size = 9) +
+    labs(y = "Mean z-score (+/- 95% C.I.)", x = "Metric", title = domain_label) +
+    theme_classic() +
+    theme(
+      plot.title = element_text(hjust = 0.5, size = 17, color = "black"),
+      axis.text.x = element_text(angle = 0, hjust = 0.5, size = 14, color = "black"),
+      axis.text.y = element_text(size = 11, color = "black"),
+      axis.title.x = element_blank(),
+      axis.title.y = element_text(size = 14, margin = margin(r = 10)),
+      legend.position = "none",
+      axis.text = element_text(size = 14, color = "black"),
+      axis.line = element_line(size = 1),
+      panel.background = element_rect(color = "white"),
+      panel.grid = element_blank()
+    ) +
+    scale_y_continuous(limits = domain_acc_rt_ylim) +
+    scale_fill_manual(values = c("Accuracy" = "#5A80C7", "Response Time" = "goldenrod1"))
+}
+
+domain_acc_rt_plots <- map(names(domain_metric_outcomes), make_domain_acc_rt_plot)
+
+domain_acc_rt_combined <- wrap_plots(domain_acc_rt_plots, ncol = 2) +
+  plot_annotation(
+    subtitle = "* FDR-corrected (q < 0.05)",
+    theme = theme(plot.subtitle = element_text(hjust = 0, size = 12, face = "italic"))
+  )
+
+domain_acc_rt_combined
+
+# Suggested manuscript figure legend:
+#   "Cognitive performance by domain, relative to normative expectations. Bar plots
+#    show mean age- and sex-normed z scores (+/- 95% confidence interval) for accuracy
+#    and response time within each cognitive domain (Executive Function, Complex
+#    Cognition, Memory, Emotion) in the total imaged cohort (n = 124). Error bars
+#    represent 95% confidence intervals. Asterisks (*) denote domains for which the
+#    mean z score differed significantly from 0 (one-sample t test) after false
+#    discovery rate (FDR) correction (q < 0.05) across all 8 domain-by-metric
+#    comparisons."
+
+# Save the combined figure
+ggsave(paste0(homedir, "results/domain_acc_rt_combined_plot.pdf"), plot = domain_acc_rt_combined, height = 8, width = 8)
+```
+
+
+# ============================================================
+# COGNITIVE DOMAIN ANALYSES BY LESION BURDEN
+# ============================================================
+
+## Cognitive Domains vs Lesion Burden
+```{r cog_by_lesion_burden_dep}
+cog_imaging_results <- map(imaging_predictors, function(img_var) {
+  # ICV covariate only for GM/WM/CSF volume -- see icv_covariate_predictors above.
+  covariates_dep <- c("test_sessions_v.age", "test_sessions_v.gender")
+  
+  #add icv as a covariate for our prespecified analyses)
+  if (img_var %in% icv_covariate_predictors) covariates_dep <- c(covariates_dep, "intracranial_volume")
+
+  tibble(outcome = cog_outcomes) %>%
+    mutate(
+      imaging_measure = img_var,
+      model  = map(outcome, ~ lm(reformulate(c(img_var, covariates_dep), response = .x),
+                                 data = cog_domains_imaging)),
+      img_lm = map(model, ~ tidy(.x, conf.int = TRUE) %>% filter(term == img_var)),
+      glance = map(model, glance)
+    ) %>%
+    transmute(
+      imaging_measure,
+      outcome,
+      estimate  = map_dbl(img_lm, "estimate"),
+      std.error = map_dbl(img_lm, "std.error"),
+      statistic = map_dbl(img_lm, "statistic"),
+      conf.low  = map_dbl(img_lm, "conf.low"),
+      conf.high = map_dbl(img_lm, "conf.high"),
+      p_value   = map_dbl(img_lm, "p.value"),
+      n         = map_dbl(glance, "nobs"),
+      r2        = map_dbl(glance, "r.squared"),
+      adj_r2    = map_dbl(glance, "adj.r.squared"),
+      p_fdr     = p.adjust(p_value, method = "fdr"),
+      p_bonf    = p.adjust(p_value, method = "bonferroni")
+    )
+}) %>%
+  bind_rows()
+
+cog_imaging_results
+```
+
+# ============================================================
+# PRL Analyses
+# ============================================================
+
+## CNB domains by PRL — full PRL subsample
+```{r cnb_vs_prl}
+prl_with_cnb <- combined_final %>%
+  filter(!is.na(prl.count)) %>%
+  mutate(
+    mean_acc_z = rowMeans(across(all_of(acc_task_columns)), na.rm = TRUE),
+    mean_rt_z  = rowMeans(across(all_of(rt_task_columns)),  na.rm = TRUE),
+    ef_acc  = rowMeans(across(all_of(ef_acc_task_columns)),  na.rm = TRUE),
+    cc_acc  = rowMeans(across(all_of(cc_acc_task_columns)),  na.rm = TRUE),
+    mem_acc = rowMeans(across(all_of(mem_acc_task_columns)), na.rm = TRUE),
+    emo_acc = rowMeans(across(all_of(emo_acc_task_columns)), na.rm = TRUE),
+    ef_rt   = rowMeans(across(all_of(ef_rt_task_columns)),   na.rm = TRUE),
+    cc_rt   = rowMeans(across(all_of(cc_rt_task_columns)),   na.rm = TRUE),
+    mem_rt  = rowMeans(across(all_of(mem_rt_task_columns)),  na.rm = TRUE),
+    emo_rt  = rowMeans(across(all_of(emo_rt_task_columns)),  na.rm = TRUE)
+  )
+
+cat("N in PRL subsample:", nrow(prl_with_cnb), "\n")
+
+cog_domain_outcomes <- c("ef_acc", "cc_acc", "mem_acc", "emo_acc",
+                         "ef_rt",  "cc_rt",  "mem_rt",  "emo_rt")
+
+prl_domain_results <- run_item_imaging_lm(cog_domain_outcomes, c("prl.count", "prl.volume..mm3."), prl_with_cnb, icv_covariate_predictors = icv_covariate_predictors)
+prl_domain_results
+```
+
+## Cognitive Domain Summary Table
+
+```{r cog_domain_summary_table}
+
+lesion_count_col   <- make_col(cog_imaging_results, "lesion_count")
+lesion_volume_col  <- make_col(cog_imaging_results, "volume_of_mimosa_lesions")
+csf_volume_col     <- make_col(cog_imaging_results, "csf_volume")
+gm_volume_col      <- make_col(cog_imaging_results, "gm_volume")
+wm_volume_col      <- make_col(cog_imaging_results, "wm_volume")
+gm_by_icv_col      <- make_col(cog_imaging_results, "gm_by_icv")
+wm_by_icv_col      <- make_col(cog_imaging_results, "wm_by_icv")
+total_volume_col   <- make_col(cog_imaging_results, "total_volume")
+prl_count_col      <- make_col(prl_domain_results,  "prl.count")
+prl_volume_col     <- make_col(prl_domain_results,  "prl.volume..mm3.")
+
+# Thalamic volume: domain-level results computed the same way as every other
+# column here (lm(domain ~ Thalamus_total_openmap_seg + age), FDR corrected
+# across the 8 domains for this one predictor -- its own family, same as
+# lesion/CSF/GM/WM/total/PRL each already get). Thalamus_total_by_icv (thalamic
+# volume normalized by ICV) gets the same treatment, its own family too.
+thalamus_domain_results <- run_item_imaging_lm(cog_outcomes, c("Thalamus_total_openmap_seg", "Thalamus_total_by_icv"), cog_domains_imaging, icv_covariate_predictors = icv_covariate_predictors)
+thalamus_col            <- make_col(thalamus_domain_results, "Thalamus_total_openmap_seg")
+thalamus_by_icv_col     <- make_col(thalamus_domain_results, "Thalamus_total_by_icv")
+
+domain_rows <- tibble(outcome = names(domain_labels)) %>%
+  mutate(Domain = domain_labels[outcome]) %>%
+  left_join(lesion_count_col,  by = "outcome") %>% dplyr::rename(`Lesion Count`    = cell) %>%
+  left_join(lesion_volume_col, by = "outcome") %>% dplyr::rename(`Lesion Volume`   = cell) %>%
+  left_join(csf_volume_col,    by = "outcome") %>% dplyr::rename(`CSF Volume`      = cell) %>%
+  left_join(gm_volume_col,     by = "outcome") %>% dplyr::rename(`GM Volume`       = cell) %>%
+  left_join(wm_volume_col,     by = "outcome") %>% dplyr::rename(`WM Volume`       = cell) %>%
+  left_join(gm_by_icv_col,     by = "outcome") %>% dplyr::rename(`GM/ICV`          = cell) %>%
+  left_join(wm_by_icv_col,     by = "outcome") %>% dplyr::rename(`WM/ICV`          = cell) %>%
+  left_join(total_volume_col,  by = "outcome") %>% dplyr::rename(`Total Volume`    = cell) %>%
+  left_join(thalamus_col,      by = "outcome") %>% dplyr::rename(`Thalamic Volume` = cell) %>%
+  left_join(thalamus_by_icv_col, by = "outcome") %>% dplyr::rename(`Thalamic/ICV`  = cell) %>%
+  left_join(prl_count_col,     by = "outcome") %>% dplyr::rename(`PRL Count`       = cell) %>%
+  left_join(prl_volume_col,    by = "outcome") %>% dplyr::rename(`PRL Volume`      = cell) %>%
+  select(Domain, `Lesion Count`, `Lesion Volume`,
+         `CSF Volume`, `GM Volume`, `WM Volume`, `GM/ICV`, `WM/ICV`, `Total Volume`,
+         `Thalamic Volume`, `Thalamic/ICV`, `PRL Count`, `PRL Volume`)
+
+# ---- Overall cognition rows (Mean Accuracy, Mean RT) ----
+# Same predictors, but each predictor's FDR family here only ever contains
+# these 2 overall outcomes -- run as separate run_item_imaging_lm() calls so
+# their p-values never mix into the 8-domain FDR family above. Per Erica: no
+# significance star at all on these two rows of mean acc and rt (not part of the domain
+# multiple-comparisons family), so a plain t(p), d formatter with no FDR arg.
+
+
+# NOTE: prl_with_cnb was built fresh in the cnb_vs_prl chunk above (filtered to
+# non-NA prl.count, with domain z-scores) -- build our own local copy here too
+# rather than depending on that chunk's version still being in the shape we want.
+overall_prl_data <- combined_final %>%
+  filter(!is.na(prl.count)) %>%
+  mutate(
+    mean_acc_z = rowMeans(across(all_of(acc_task_columns)), na.rm = TRUE),
+    mean_rt_z  = rowMeans(across(all_of(rt_task_columns)),  na.rm = TRUE)
+  )
+
+overall_imaging_results  <- run_item_imaging_lm(c("mean_acc_z", "mean_rt_z"), imaging_predictors, cog_domains_imaging, icv_covariate_predictors = icv_covariate_predictors)
+overall_prl_results      <- run_item_imaging_lm(c("mean_acc_z", "mean_rt_z"), c("prl.count", "prl.volume..mm3."), overall_prl_data, icv_covariate_predictors = icv_covariate_predictors)
+overall_thalamus_results <- run_item_imaging_lm(c("mean_acc_z", "mean_rt_z"), c("Thalamus_total_openmap_seg", "Thalamus_total_by_icv"), cog_domains_imaging, icv_covariate_predictors = icv_covariate_predictors)
+
+overall_labels <- c(mean_acc_z = "Mean Accuracy", mean_rt_z = "Mean RT")
+
+overall_rows <- tibble(outcome = names(overall_labels)) %>%
+  mutate(Domain = overall_labels[outcome]) %>%
+  left_join(make_col_nostar(overall_imaging_results,  "lesion_count"),               by = "outcome") %>% dplyr::rename(`Lesion Count`    = cell) %>%
+  left_join(make_col_nostar(overall_imaging_results,  "volume_of_mimosa_lesions"),   by = "outcome") %>% dplyr::rename(`Lesion Volume`   = cell) %>%
+  left_join(make_col_nostar(overall_imaging_results,  "csf_volume"),                 by = "outcome") %>% dplyr::rename(`CSF Volume`      = cell) %>%
+  left_join(make_col_nostar(overall_imaging_results,  "gm_volume"),                  by = "outcome") %>% dplyr::rename(`GM Volume`       = cell) %>%
+  left_join(make_col_nostar(overall_imaging_results,  "wm_volume"),                  by = "outcome") %>% dplyr::rename(`WM Volume`       = cell) %>%
+  left_join(make_col_nostar(overall_imaging_results,  "gm_by_icv"),                  by = "outcome") %>% dplyr::rename(`GM/ICV`          = cell) %>%
+  left_join(make_col_nostar(overall_imaging_results,  "wm_by_icv"),                  by = "outcome") %>% dplyr::rename(`WM/ICV`          = cell) %>%
+  left_join(make_col_nostar(overall_imaging_results,  "total_volume"),               by = "outcome") %>% dplyr::rename(`Total Volume`    = cell) %>%
+  left_join(make_col_nostar(overall_thalamus_results, "Thalamus_total_openmap_seg"), by = "outcome") %>% dplyr::rename(`Thalamic Volume` = cell) %>%
+  left_join(make_col_nostar(overall_thalamus_results, "Thalamus_total_by_icv"),      by = "outcome") %>% dplyr::rename(`Thalamic/ICV`    = cell) %>%
+  left_join(make_col_nostar(overall_prl_results,      "prl.count"),                  by = "outcome") %>% dplyr::rename(`PRL Count`       = cell) %>%
+  left_join(make_col_nostar(overall_prl_results,      "prl.volume..mm3."),           by = "outcome") %>% dplyr::rename(`PRL Volume`      = cell) %>%
+  select(Domain, `Lesion Count`, `Lesion Volume`,
+         `CSF Volume`, `GM Volume`, `WM Volume`, `GM/ICV`, `WM/ICV`, `Total Volume`,
+         `Thalamic Volume`, `Thalamic/ICV`, `PRL Count`, `PRL Volume`)
+
+cog_summary_table <- bind_rows(domain_rows, overall_rows)
+
+# Full 12-column table (adds CSF Volume, GM/ICV, WM/ICV, Total Volume, Thalamic/ICV
+# back in) -- kept here commented out in case it's needed later. Uncomment to render it.
+# col_names <- c(
+#   "Domain",
+#   paste0("Lesion Count (n=",    get_n(cog_imaging_results,     "lesion_count"), ")"),
+#   paste0("Lesion Volume (n=",   get_n(cog_imaging_results,     "volume_of_mimosa_lesions"), ")"),
+#   paste0("CSF Volume (n=",      get_n(cog_imaging_results,     "csf_volume"), ")"),
+#   paste0("GM Volume (n=",       get_n(cog_imaging_results,     "gm_volume"), ")"),
+#   paste0("WM Volume (n=",       get_n(cog_imaging_results,     "wm_volume"), ")"),
+#   paste0("GM/ICV (n=",          get_n(cog_imaging_results,     "gm_by_icv"), ")"),
+#   paste0("WM/ICV (n=",          get_n(cog_imaging_results,     "wm_by_icv"), ")"),
+#   paste0("Total Volume (n=",    get_n(cog_imaging_results,     "total_volume"), ")"),
+#   paste0("Thalamic Volume (n=", get_n(thalamus_domain_results, "Thalamus_total_openmap_seg"), ")"),
+#   paste0("Thalamic/ICV (n=",    get_n(thalamus_domain_results, "Thalamus_total_by_icv"), ")"),
+#   paste0("PRL Count (n=",       get_n(prl_domain_results,      "prl.count"), ")"),
+#   paste0("PRL Volume (n=",      get_n(prl_domain_results,      "prl.volume..mm3."), ")")
+# )
+#
+# cog_table_for_viewing <- kable(cog_summary_table,
+#       col.names = col_names,
+#       caption = "Cognitive domains (FDR-corrected within each imaging measure, * = FDR p < 0.05) plus overall cognition (Mean Accuracy / Mean RT, not part of the domain FDR family, no significance marking) by imaging measures: T(p), d=Cohen's d",
+#       align = c("l", rep("c", 12))) %>%
+#   kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+# cog_table_for_viewing
+```
+
+## Cognitive Domain Summary Table (simplified)
+
+Narrower view of the cognitive domain summary table above: lesion count/volume,
+GM/WM volume, thalamic volume, and PRL count/volume only -- no CSF, Total Volume, or the
+ICV-corrected (GM/ICV, WM/ICV, Thalamic/ICV) columns.
+
+```{r cog_domain_summary_table_simple}
+col_names_simple <- c(
+  "Domain",
+  paste0("Lesion Count (n=",    get_n(cog_imaging_results,     "lesion_count"), ")"),
+  paste0("Lesion Volume (n=",   get_n(cog_imaging_results,     "volume_of_mimosa_lesions"), ")"),
+  paste0("GM Volume (n=",       get_n(cog_imaging_results,     "gm_volume"), ")"),
+  paste0("WM Volume (n=",       get_n(cog_imaging_results,     "wm_volume"), ")"),
+  paste0("Thalamic Volume (n=", get_n(thalamus_domain_results, "Thalamus_total_openmap_seg"), ")"),
+  paste0("PRL Count (n=",       get_n(prl_domain_results,      "prl.count"), ")"),
+  paste0("PRL Volume (n=",      get_n(prl_domain_results,      "prl.volume..mm3."), ")")
+)
+
+cog_summary_table_simple <- cog_summary_table %>%
+  select(Domain, `Lesion Count`, `Lesion Volume`, `GM Volume`, `WM Volume`,
+         `Thalamic Volume`, `PRL Count`, `PRL Volume`)
+
+cog_table_for_viewing_simple <- kable(cog_summary_table_simple,
+      col.names = col_names_simple,
+      caption = "Cognitive domains (FDR-corrected within each imaging measure, * = FDR p < 0.05) plus overall cognition (Mean Accuracy / Mean RT, not part of the domain FDR family, no significance marking) by imaging measures: T(p), d=Cohen's d",
+      align = c("l", rep("c", 7))) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+cog_table_for_viewing_simple
+
+# Save the rendered table (with caption/stars/formatting intact) to the results folder.
+# self_contained = FALSE skips kableExtra's pandoc-based bundling step (not guaranteed
+# to be on PATH in every R setup) -- writes plain HTML plus a small asset subfolder
+# instead of a single self-contained file, but needs no external dependency to work.
+
+
+#### WOULD SAVE THIS YOURSELF TO check###
+#save_kable(cog_table_for_viewing_simple, file = paste0(homedir, "results/cog_domain_summary_table_simple.html"), self_contained = FALSE)
+
+```
+
