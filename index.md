@@ -46,7 +46,7 @@ MS Proviers (local computer)
      
 Medication information: 
      
-[ms_medications_brand_and_generic](https://github.com/Baller-Lab/medications/ms_medications_brand_and_generic.csv) 
+[ms_medications_brand_and_generic](https://github.com/Baller-Lab/tree/main/medications/ms_medications_brand_and_generic.csv) 
 
 Subject imaging data (cluster): 
 
