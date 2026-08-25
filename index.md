@@ -77,7 +77,7 @@ Volume of all lesions (NOT fascicles) for each subject (cluster):
 <br>
 
 ### * Functions for project *
-[ms_functions.R](https://github.com/Baller-Lab/ms_cnb_2026/scripts/msdep_prospective_functions.R)
+[msdep_prospective_functions.R](https://github.com/Baller-Lab/ms_cnb_2026/scripts/msdep_prospective_functions.R)
 
 ### Sample Construction
 
@@ -92,6 +92,15 @@ Of these, n=103 had good T1 scans that were used for FAST segmentation and thala
 After we obtained our sample, we used the Method for Intermodal Segmentation Analysis (MIMoSA) to extract white matter lesions for each subject. MIMoSA has been previously described: 
 
 Valcarcel AM, Linn KA, Vandekar SN, Satterthwaite TD, Muschelli J, Calabresi PA, Pham DL, Martin ML, Shinohara RT. MIMoSA: An Automated Method for Intermodal Segmentation Analysis of Multiple Sclerosis Brain Lesions. J Neuroimaging. 2018 Jul;28(4):389-398. [doi: 10.1111/jon.12506](https://pubmed.ncbi.nlm.nih.gov/29516669/). Epub 2018 Mar 8. PMID: 29516669; PMCID: PMC6030441.
+
+After lesions were segmented with MIMoSA, we calculated the overall volume of white matter lesions. [get_volume_of_mimosa_lesions.sh](https://github.com/Baller-Lab/scripts/lesion_volume/get_volume_of_mimosa_lesions.sh)
+
+### Lesion Count
+We then used the PennSIVE pipelines to do lesion count:
+[run_lesion_count.sh](https://github.com/Baller-Lab/scripts/lesion_count/run_lesion_count.sh)
+
+And tabulate the results in a .csv.
+[create_lesion_count_csv.sh](https://github.com/Baller-Lab/scripts/lesion_count/create_lesion_count_csv.sh)
 
 ### Brain segmentation
 
@@ -114,7 +123,7 @@ Volume calculation script:
 
 This script is run locally, on R. It does all second level/group data analysis. Main steps summarized below.
 
-[MS_cnb_manuscript_FINAL.Rmd](https://github.com/Baller-Lab/ms_cnb_2026scripts/cnb_lesion_structural_prl_final_analyses_pre_replication_20260818.Rmd)
+[cnb_lesion_structural_prl_final_analyses_pre_replication_20260818.Rmd](https://github.com/Baller-Lab/ms_cnb_2026scripts/cnb_lesion_structural_prl_final_analyses_pre_replication_20260818.Rmd)
 
 #### Overall Cognitive Results
 
