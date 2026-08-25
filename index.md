@@ -129,11 +129,11 @@ This script is run locally, on R. It does all second level/group data analysis. 
 [cnb_lesion_structural_prl_final_analyses_pre_replication_20260818.Rmd](https://github.com/Baller-Lab/ms_cnb_2026/tree/main/scripts/cnb_lesion_structural_prl_final_analyses_pre_replication_20260818.Rmd)
 
 #### Overall Cognitive Results
-![overall_mean_accuracy_and_rt](https://github.com/Baller-Lab/ms_cnb_2026/tree/main/results/total_mean_plot.png)
+![overall_mean_accuracy_and_rt](https://github.com/Baller-Lab/ms_cnb_2026/total_mean_plot.png)
 
 #### Cognitive Results by Domain
-![mean_acc_and_rt_by_domain](https://github.com/Baller-Lab/ms_cnb_2026/tree/main/results/domain_acc_rt_combined_plot.png)
+![mean_acc_and_rt_by_domain](https://github.com/Baller-Lab/ms_cnb_2026/domain_acc_rt_combined_plot.png)
 
 #### Cognitive Results by Domain vs Lesion, GM, WM, Thalamus, and PRL Metrics
-[cognition_by_imaging_metric](https://github.com/Baller-Lab/ms_cnb_2026/tree/main/results/cog_domain_summary_table_simple.png)
+[cognition_by_imaging_metric](https://github.com/Baller-Lab/ms_cnb_2026/cog_domain_summary_table_simple.png)
 
