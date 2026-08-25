@@ -135,5 +135,5 @@ This script is run locally, on R. It does all second level/group data analysis. 
 ![mean_acc_and_rt_by_domain](results/domain_acc_rt_combined_plot.png)
 
 #### Cognitive Results by Domain vs Lesion, GM, WM, Thalamus, and PRL Metrics
-[cognition_by_imaging_metric](results/cog_domain_summary_table_simple.png)
+![cognition_by_imaging_metric](results/cog_domain_summary_table_simple.png)
 
