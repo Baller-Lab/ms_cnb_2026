@@ -55,10 +55,8 @@ Subject imaging data (cluster):
 Cubids (cluster): 
 
      Scripts: /project/msdepression/data/radiology_pulls_20260610/code/cubids
-     Outputs: 
-     1. /project/msdepression/data/radiology_pulls_20260610/data/other_data/v
-0_files_pull_1_proj60
-     2. /project/msdepression/data/radiology_pulls_20260610/data/other_data/v
+     Outputs: /project/msdepression/data/radiology_pulls_20260610/data/other_data/v
+0_files_pull_1_proj60; /project/msdepression/data/radiology_pulls_20260610/data/other_data/v
 0_files_pull_2_proj66
      
 Volume of all lesions for each subject: 
