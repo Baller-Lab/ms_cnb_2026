@@ -46,25 +46,18 @@ MS Proviers (local computer)
      
 Medication information: 
      
-[ms_medications_brand_and_generic](https://github.com/Baller-Lab/msanxiety/tree/main/medication_data/ms_medications_brand_and_generic_cleaned.csv) 
-
-[nami_psych_meds](https://github.com/Baller-Lab/msanxiety/tree/main/medication_data/nami_psych_meds_antidepressants_plus_gabapentin_and_amitriptyline_benzos_beta_blockers.csv)
-
+[ms_medications_brand_and_generic](https://github.com/Baller-Lab/medications/ms_medications_brand_and_generic.csv) 
 
 Subject imaging data (cluster): 
 
-     /project/msanxiety/data/subj_directories
+     /project/msdepression/data/subj_directories
 
 Cubids (cluster): 
 
      /project/msanxiety/cubids/v1_validation.csv
      /project/msanxiety/CuBIDS_outputs/*
      
-MIMoSA QA info (cluster):
-
-     /project/msanxiety/data/melissa_martin_files/csv/mimosa_dataframe
-
-Volume of all lesions (NOT fascicles) for each subject (cluster): 
+Volume of all lesions for each subject: 
 
      /project/msanxiety/results/mimosa_binary_masks_hcp_space_20211026_n2336_volumes.csv
 
@@ -116,6 +109,16 @@ Volume calculation script:
 [make_fast_volume_csv.sh](https://github.com/Baller-Lab/scripts/fast/make_fast_volume_csv.sh)
 
 ### Thalamus Segmentation
+We then used Openmap_t1 to obtain thalamic segmentations. See https://github.com/OishiLab/OpenMAP-T1 for more info, Nishimaki, K., Onda, K., Ikuta, K., Chotiyanonta, J., Uchida, Y., Mori, S., Iyatomi, H., Oishi, K., Alzheimer's Disease Neuroimaging Initiative and Australian Imaging Biomarkers and Lifestyle Flagship Study of Ageing (2024), OpenMAP-T1: A Rapid Deep-Learning Approach to Parcellate 280 Anatomical Regions to Cover the Whole Brain. Hum Brain Mapp, 45: e70063. https://doi-org.proxy.library.upenn.edu/10.1002/hbm.70063. 
+
+Wrapper used to call individual segmentation scripts to run in parallel
+[openmap_t1_wrapper.sh](https://github.com/Baller-Lab/scripts/openmap_t1_project_scripts/openmap_t1_wrapper.sh)
+
+Individual segmentation script
+[indiv_openmap_t1_script.sh](https://github.com/Baller-Lab/scripts/openmap_t1_project_scripts/indiv_openmap_t1_script.sh)
+
+Assemble all thalamic segmentations into a csv
+[assemble_openmap_t1_volumes.sh](https://github.com/Baller-Lab/scripts/openmap_t1_project_scripts/assemble_openmap_t1_volumes.sh)
 
 ### PRL preprocessing
 
@@ -123,14 +126,16 @@ Volume calculation script:
 
 This script is run locally, on R. It does all second level/group data analysis. Main steps summarized below.
 
-[cnb_lesion_structural_prl_final_analyses_pre_replication_20260818.Rmd](https://github.com/Baller-Lab/ms_cnb_2026scripts/cnb_lesion_structural_prl_final_analyses_pre_replication_20260818.Rmd)
+[cnb_lesion_structural_prl_final_analyses_pre_replication_20260818.Rmd](https://github.com/Baller-Lab/ms_cnb_2026/scripts/cnb_lesion_structural_prl_final_analyses_pre_replication_20260818.Rmd)
 
 #### Overall Cognitive Results
+![overall_mean_accuracy_and_rt](https://github.com/Baller-Lab/ms_cnb_2026/results/total_mean_plot.pdf)
 
 #### Cognitive Results by Domain
+![mean_acc_and_rt_by_domain](https://github.com/Baller-Lab/ms_cnb_2026/results/domain_acc_rt_combined_plot.pdf)
 
 #### Cognitive Results by Domain vs Lesion, GM, WM, Thalamus, and PRL Metrics
-
+[cognition_by_imaging_metric](https://github.com/Baller-Lab/ms_cnb_2026/results/)
 
 #### Disease burden summary measures
 I wanted to look specifically at mean disease burden in uncinate fasiculus, given previous literature suggesting that the uncinate is the main white matter bundle connecting mPFC and amygdala, core brain areas associated with anxiety disorders. 
