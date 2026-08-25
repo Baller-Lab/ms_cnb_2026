@@ -129,39 +129,11 @@ This script is run locally, on R. It does all second level/group data analysis. 
 [cnb_lesion_structural_prl_final_analyses_pre_replication_20260818.Rmd](https://github.com/Baller-Lab/ms_cnb_2026/scripts/cnb_lesion_structural_prl_final_analyses_pre_replication_20260818.Rmd)
 
 #### Overall Cognitive Results
-![overall_mean_accuracy_and_rt](https://github.com/Baller-Lab/ms_cnb_2026/results/total_mean_plot.pdf)
+![overall_mean_accuracy_and_rt](https://github.com/Baller-Lab/ms_cnb_2026/results/total_mean_plot.png)
 
 #### Cognitive Results by Domain
-![mean_acc_and_rt_by_domain](https://github.com/Baller-Lab/ms_cnb_2026/results/domain_acc_rt_combined_plot.pdf)
+![mean_acc_and_rt_by_domain](https://github.com/Baller-Lab/ms_cnb_2026/results/domain_acc_rt_combined_plot.png)
 
 #### Cognitive Results by Domain vs Lesion, GM, WM, Thalamus, and PRL Metrics
-[cognition_by_imaging_metric](https://github.com/Baller-Lab/ms_cnb_2026/results/)
-
-#### Disease burden summary measures
-I wanted to look specifically at mean disease burden in uncinate fasiculus, given previous literature suggesting that the uncinate is the main white matter bundle connecting mPFC and amygdala, core brain areas associated with anxiety disorders. 
-    
-#### Main effect of Diagnosis
-
-A gam with mean_UF_vol as dependent variable, modeling main effect of anxiety diagnosis (MS+noA vs MS+severeA), with sex, total brain volume, and spline of age as covariates.
-     
-     gam(mean_UF_vol ~ Diagnosis + osex+s(PAT_AGE_AT_EXAM, k = 4, fx = F)+ total_volume, data = uncinate_by_dx_df)
-
-#### Parametric effect of anxiety "dose"
-
-A gam with mean_UF_vol as dependent variable, modeling main effect of anxiety dose (dose = 0 (MS+nA), 1 (MS+mildA), or 2 (MS+severeA)), with sex and spline of age as covariates.
-     
-     gam(mean_UF_vol ~ anxiety_dose + osex + s(PAT_AGE_AT_EXAM, k = 4, fx = F)+ total_volume, data=df_demo_and_fascicles_no_unclass_anxiety_dose)
-
-#### Sensitivity analyses
-As a comparison, I also looked specifically at fornix, which is another subcortical fiber connecting prefrontal and medial temporal lobe (anterior cingulate/hippocampus), primarily involved in cognition/memory, rather than anxiety (N.S.) 
-
-     gam(mean_fornix_volume ~ anxiety_dose + osex + s(PAT_AGE_AT_EXAM, k = 4, fx = F)+ total_volume, data=df_demo_and_fascicles_no_unclass_anxiety_dose)
-
-To test whether this was specific to anxiety diagnosis and did not simply reflect general internalizing symptoms, I also evaluated mean uncinate volume in patients with MS+Depression (199) or MS+noDep (99) in this cohort (N.S.) 
-     
-     gam(mean_UF_vol ~ depDiagnosis + osex + s(PAT_AGE_AT_EXAM, k=4, fx=F)+ total_volume, data = df_dep)
-
-I also evaluated whether lesion volume was associated with anxiety diagnosis, severity, and depression, and all were significant, suggesting that total lesion volume is associated with general psychopathology.
-
-     gam(volume_of_mimosa_lesions ~ (depDiagnosis|Diagnosis|anxiety_dose) + osex + s(PAT_AGE_AT_EXAM, k=4, fx=F)+ total_volume, data=(df_dep|uncinate_by_dx_df|df_demo_and_fascicles_no_unclass_anxiety_dose)) 
+[cognition_by_imaging_metric](https://github.com/Baller-Lab/ms_cnb_2026/results/cog_domain_summary_table_simple.png)
 
