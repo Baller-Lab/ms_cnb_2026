@@ -1,0 +1,36 @@
+﻿Medication,Mechanism,DMT
+Cladribine,anti-metabolite,y
+Mavenclad,anti-metabolite,y
+Fumaric acid esters,nrf-2,y
+Tecfidera,nrf-2,y
+Fumaderm,nrf-2,y
+Glatiramer acetate,mbp-analog,y
+Copaxone,mbp-analog,y
+Glatopa,mbp-analog,y
+Teriflunomide,DHODH-inhibitor,y
+Aubagio,DHODH-inhibitor,y
+Sphingosine-1-phosphate receptor modulators,s1p-agonist,y
+Gilenya,s1p-agonist,y
+Natalizumab,a4_integrin-inhibitor,y
+Tysabri,a4_integrin-inhibitor,y
+Interferons,Interferon,y
+Avonex,Interferon,y
+Rebif,Interferon,y
+Betaseron,Interferon,y
+Extavia,Interferon,y
+Plegridy,Interferon,y
+Avonex Pen,Interferon,y
+Prednisone,Steroid,n
+Deltasone,Steroid,n
+Sterapred,Steroid,n
+Methylprednisolone,Steroid,n
+Medrol,Steroid,n
+Solu-Medrol,Steroid,n
+Ocrevus,anti-cd20,y
+Kesimpta,anti-cd20,y
+Briumvi,anti-cd20,y
+Ocrelizumab,anti-cd20,y
+Ofatumumab,anti-cd20,y
+rituximab,anti-cd20,y
+ublituximab,anti-cd20,y
+rituxan,anti-cd20,y
