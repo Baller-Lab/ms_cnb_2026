@@ -79,24 +79,24 @@ Volume of all lesions for each subject:
 
 We first constructed our sample from n=125 individuals who were diagnosed with multiple sclerosis by a Multiple Sclerosis provider and who had CNB. 
 
-Of these, n=103 had good T1 scans that were used for FAST segmentation and thalamic segmentation. n=102 had good T1s and FLAIRs (one person had missing FLAIR). n=27 had PRL data. In our combining script, all data were combined in a spreadsheet (with CNB, demos), and deidentified. This output csv was then taken to the full analysis script. 
-
-[make_combined_spreadsheet_for_cnb_paper.Rmd](https://github.com/Baller-Lab/ms_cnb_2026/tree/main/scripts/make_combined_spreadsheet_for_cnb_paper.Rmd)
-
 ### Automated white matter lesion segmentation
 
 After we obtained our sample, we used the Method for Intermodal Segmentation Analysis (MIMoSA) to extract white matter lesions for each subject. MIMoSA has been previously described: 
 
 Valcarcel AM, Linn KA, Vandekar SN, Satterthwaite TD, Muschelli J, Calabresi PA, Pham DL, Martin ML, Shinohara RT. MIMoSA: An Automated Method for Intermodal Segmentation Analysis of Multiple Sclerosis Brain Lesions. J Neuroimaging. 2018 Jul;28(4):389-398. [doi: 10.1111/jon.12506](https://pubmed.ncbi.nlm.nih.gov/29516669/). Epub 2018 Mar 8. PMID: 29516669; PMCID: PMC6030441.
 
-After lesions were segmented with MIMoSA, we calculated the overall volume of white matter lesions. [get_volume_of_mimosa_lesions.sh](https://github.com/Baller-Lab/ms_cnb_2026/tree/main/scripts/lesion_volume/get_volume_of_mimosa_lesions.sh)
+After lesions were segmented with MIMoSA, we calculated the overall volume of white matter lesions: 
+
+[get_volume_of_mimosa_lesions.sh](https://github.com/Baller-Lab/ms_cnb_2026/tree/main/scripts/lesion_volume/get_volume_of_mimosa_lesions.sh)
 
 ### Lesion Count
 
 We then used the PennSIVE pipelines to do lesion count:
+
 [run_lesion_count.sh](https://github.com/Baller-Lab/ms_cnb_2026/tree/main/scripts/lesion_count/run_lesion_count.sh)
 
-And tabulate the results in a .csv.
+And tabulate the results in a .csv:
+
 [create_lesion_count_csv.sh](https://github.com/Baller-Lab/ms_cnb_2026/tree/main/scripts/lesion_count/create_lesion_count_csv.sh)
 
 ### Brain segmentation
@@ -104,28 +104,39 @@ And tabulate the results in a .csv.
 To obtain a measure of total brain volume (minus CSF), I used FSL's fast on all T1w images (post n4 and ws). I then summed the grey matter and white matter volume to create a measure of total brain volume (total_volume).
 
 Wrapper script:
+
 [get_fast_total_brain_volume_all_subjs.sh](https://github.com/Baller-Lab/ms_cnb_2026/tree/main/scripts/fast/get_fast_total_brain_volume_all_subjs.sh)
 
 Segmentation script:
+
 [make_fast_files_single_subj_pmacs.sh](https://github.com/Baller-Lab/ms_cnb_2026/tree/main/scripts/fast/make_fast_files_single_subj.sh)
 
 Volume calculation script:
+
 [make_fast_volume_csv.sh](https://github.com/Baller-Lab/ms_cnb_2026/tree/main/scripts/fast/make_fast_volume_csv.sh)
 
 ### Thalamus Segmentation
 
 We then used Openmap_t1 to obtain thalamic segmentations. See https://github.com/OishiLab/OpenMAP-T1 for more info, Nishimaki, K., Onda, K., Ikuta, K., Chotiyanonta, J., Uchida, Y., Mori, S., Iyatomi, H., Oishi, K., Alzheimer's Disease Neuroimaging Initiative and Australian Imaging Biomarkers and Lifestyle Flagship Study of Ageing (2024), OpenMAP-T1: A Rapid Deep-Learning Approach to Parcellate 280 Anatomical Regions to Cover the Whole Brain. Hum Brain Mapp, 45: e70063. https://doi-org.proxy.library.upenn.edu/10.1002/hbm.70063. 
 
-Wrapper used to call individual segmentation scripts to run in parallel
+Wrapper used to call individual segmentation scripts to run in parallel:
+
 [openmap_t1_wrapper.sh](https://github.com/Baller-Lab/ms_cnb_2026/tree/main/scripts/openmap_t1_project_scripts/openmap_t1_wrapper.sh)
 
-Individual segmentation script
+Individual segmentation script:
+
 [indiv_openmap_t1_script.sh](https://github.com/Baller-Lab/ms_cnb_2026/tree/main/scripts/openmap_t1_project_scripts/indiv_openmap_t1_script.sh)
 
-Assemble all thalamic segmentations into a csv
+Assemble all thalamic segmentations into a csv:
+
 [assemble_openmap_t1_volumes.sh](https://github.com/Baller-Lab/ms_cnb_2026/tree/main/scripts/openmap_t1_project_scripts/assemble_openmap_t1_volumes.sh)
 
 ### PRL preprocessing
+
+### Combining groups
+Of the n=125 in our sample, n=103 had good T1 scans that were used for FAST segmentation and thalamic segmentation. n=102 had good T1s and FLAIRs (one person had missing FLAIR). n=27 had PRL data. In our combining script, all data were combined in a spreadsheet (with CNB, demos), and deidentified. This output csv was then taken to the full analysis script. 
+
+[make_combined_spreadsheet_for_cnb_paper.Rmd](https://github.com/Baller-Lab/ms_cnb_2026/tree/main/scripts/make_combined_spreadsheet_for_cnb_paper.Rmd)
 
 ### Final group level analysis
 
