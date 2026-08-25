@@ -45,7 +45,6 @@ MS Proviers (local computer):
      ~Box/BBL/general_emr_relevant_spreadsheets//msproviders.csv
      
 Medication information: 
-     
      [ms_medications_brand_and_generic](https://github.com/Baller-Lab/ms_cnb_2026/tree/main/medications/ms_medications_brand_and_generic.csv) 
 
 Subject imaging data (cluster): 
