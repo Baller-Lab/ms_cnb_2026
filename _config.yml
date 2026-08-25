@@ -1,4 +1,5 @@
-title: <br>Association of Penn CNB with lesion and structural metrics in Adults with MS
-logo: ./total_mean_plot.png
-description: <br>
+layout: default
+title: "Association of Penn CNB with lesion and structural metrics in Adults with MS"
+logo: "./results/total_mean_plot.png"
+description: "Analysis of cognitive performance alongside multi-modal imaging variables including lesion burden and brain volumes."
 theme: jekyll-theme-minimal
