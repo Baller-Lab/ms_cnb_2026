@@ -40,26 +40,30 @@ ECTRIMS 2026 Poster - "Domain-Specific Cognitive Impairments Identified by the P
 
 ### Path to Data on Filesystem **PMACS**
 
-MS Proviers (local computer)
+MS Proviers (local computer): 
 
-     /Users/eballer/BBL/general_emr_relevant_spreadsheets//msproviders.csv
+     ~Box/BBL/general_emr_relevant_spreadsheets//msproviders.csv
      
 Medication information: 
      
-[ms_medications_brand_and_generic](https://github.com/Baller-Lab/ms_cnb_2026/tree/main/medications/ms_medications_brand_and_generic.csv) 
+     [ms_medications_brand_and_generic](https://github.com/Baller-Lab/ms_cnb_2026/tree/main/medications/ms_medications_brand_and_generic.csv) 
 
 Subject imaging data (cluster): 
 
-     /project/msdepression/data/subj_directories
+     /project/msdepression/data/radiology_pulls_20260610/data/
 
 Cubids (cluster): 
 
-     /project/msanxiety/cubids/v1_validation.csv
-     /project/msanxiety/CuBIDS_outputs/*
+     Scripts: /project/msdepression/data/radiology_pulls_20260610/code/cubids
+     Outputs: 
+     1. /project/msdepression/data/radiology_pulls_20260610/data/other_data/v
+0_files_pull_1_proj60
+     2. /project/msdepression/data/radiology_pulls_20260610/data/other_data/v
+0_files_pull_2_proj66
      
 Volume of all lesions for each subject: 
 
-     /project/msanxiety/results/mimosa_binary_masks_hcp_space_20211026_n2336_volumes.csv
+     /project/msdepression/results/vol_mimosa_lesions/mimosa_volume_values_n105_20260702_094134.csv
 
 <br>
 <br>
@@ -70,6 +74,7 @@ Volume of all lesions for each subject:
 <br>
 
 ### * Functions for project *
+
 [msdep_prospective_functions.R](https://github.com/Baller-Lab/ms_cnb_2026/tree/main/scripts/msdep_prospective_functions.R)
 
 ### Sample Construction
@@ -89,6 +94,7 @@ Valcarcel AM, Linn KA, Vandekar SN, Satterthwaite TD, Muschelli J, Calabresi PA,
 After lesions were segmented with MIMoSA, we calculated the overall volume of white matter lesions. [get_volume_of_mimosa_lesions.sh](https://github.com/Baller-Lab/ms_cnb_2026/tree/main/scripts/lesion_volume/get_volume_of_mimosa_lesions.sh)
 
 ### Lesion Count
+
 We then used the PennSIVE pipelines to do lesion count:
 [run_lesion_count.sh](https://github.com/Baller-Lab/ms_cnb_2026/tree/main/scripts/lesion_count/run_lesion_count.sh)
 
@@ -109,6 +115,7 @@ Volume calculation script:
 [make_fast_volume_csv.sh](https://github.com/Baller-Lab/ms_cnb_2026/tree/main/scripts/fast/make_fast_volume_csv.sh)
 
 ### Thalamus Segmentation
+
 We then used Openmap_t1 to obtain thalamic segmentations. See https://github.com/OishiLab/OpenMAP-T1 for more info, Nishimaki, K., Onda, K., Ikuta, K., Chotiyanonta, J., Uchida, Y., Mori, S., Iyatomi, H., Oishi, K., Alzheimer's Disease Neuroimaging Initiative and Australian Imaging Biomarkers and Lifestyle Flagship Study of Ageing (2024), OpenMAP-T1: A Rapid Deep-Learning Approach to Parcellate 280 Anatomical Regions to Cover the Whole Brain. Hum Brain Mapp, 45: e70063. https://doi-org.proxy.library.upenn.edu/10.1002/hbm.70063. 
 
 Wrapper used to call individual segmentation scripts to run in parallel
