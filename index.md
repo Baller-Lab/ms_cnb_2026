@@ -10,7 +10,7 @@ Erica B. Baller
 125 participants with MS were included (75.8%F, mean age 43.1). Cognitive assessments with CNB were performed and summarized by overall accuracy and speed, and by cognitive domain. Patterns of cognitive disease were then evaluated in relation to lesion burden (count and volume, n=102), GM, WM, and thalamic volume (n=103) from research-grade clinical scans, and PRL burden (count and volume, n=27) from 7T. 
 
 ### Authors/Collaborators:
-Erica B. Baller, M.D., M.S., Elizabeth A. Horwath, Ph.D., Millie R. Sach, B.A., Elena C. Cooper, B.A., Nikka Bakhtiar, M.S., Amit Bar-Or, M.D., Rachel B. Brandstadter, M.D., Ruben C. Gur, Ph.D., Dina A. Jacobs, M.D., Christopher M. Perrone, M.D., David R. Roalf, Ph.D., Kosha Ruparel, M.S.E., J. Cobb Scott, Ph.D., Theodore D. Satterthwaite, M.D., M.A., Russell T. Shinohara, Ph.D., Matthew K. Schindler, M.D., Ph.D. <img width="468" height="84" alt="image" src="https://github.com/user-attachments/assets/da632e3e-0d1e-42a2-99ec-33dd6324d288" />
+Erica B. Baller, M.D., M.S., Elizabeth A. Horwath, Ph.D., Millie R. Sach, B.A., Elena C. Cooper, B.A., Nikka Bakhtiar, M.S., Amit Bar-Or, M.D., Rachel B. Brandstadter, M.D., Ruben C. Gur, Ph.D., Dina A. Jacobs, M.D., Christopher M. Perrone, M.D., David R. Roalf, Ph.D., Kosha Ruparel, M.S.E., J. Cobb Scott, Ph.D., Theodore D. Satterthwaite, M.D., M.A., Russell T. Shinohara, Ph.D., Matthew K. Schindler, M.D., Ph.D. 
 
 
 ### Project Start Date:
@@ -26,7 +26,7 @@ K23 Multiple Sclerosis Cohort (collected between July 1, 2023 and April 30, 2026
 [https://github.com/Baller-Lab/ms_cnb_2026/](https://github.com/Baller-Lab/ms_cnb_2026)
 
 ### Website
-[https://Baller-Lab.github.io/msanxiety/](https://Baller-Lab.github.io/ms_cnb_2026/)
+[https://Baller-Lab.github.io/ms_cnb_2026/](https://Baller-Lab.github.io/ms_cnb_2026/)
 
 ### Slack Channel:
 #ms-lesion_count_and_mimosa
@@ -83,9 +83,9 @@ Volume of all lesions (NOT fascicles) for each subject (cluster):
 
 We first constructed our sample from n=125 individuals who were diagnosed with multiple sclerosis by a Multiple Sclerosis provider and who had CNB. 
 
-Of these The following code takes the n=825 sample, and goes through a variety of exclusions to get the final n. Specifically, after excluding 11 participants with poor mimosa quality (23) or streamline filtering (55), 814 participants were eligible for anxiety classification.  Participants with MS were identified from the electronic medical record and stratified into three age- and sex-matched groups: 1) MS without anxiety (MS+noA); 2) MS with mild anxiety (MS+mildA), 3) MS with severe anxiety (MS+severeA). MS+noA included persons who had no psychiatric diagnosis, took no psychiatric medications, and were asymptomatic on PHQ 2/9 (n = 99, age (SD) = 49.4 (11.7), % female = 75). MS+mildA included persons with either a diagnosis of an anxiety disorder (F40*) or a prescription for an anti-anxiety medication (n = 249, age (SD) = 47.1 (11.1), % female = 82). MS+severeA included persons who had both an anxiety disorder and were taking an anti-anxiety medication (n = 24, age (SD) = 47.0 (12.2), % female = 79).
+Of these, n=103 had good T1 scans that were used for FAST segmentation and thalamic segmentation. n=102 had good T1s and FLAIRs (one person had missing FLAIR). n=27 had PRL data. In our combining script, all data were combined in a spreadsheet (with CNB, demos), and deidentified. This output csv was then taken to the full analysis script. 
 
-[clean_dac_pull_icd10_codes_and_make_clean_df_post_replication.R](https://github.com/Baller-Lab/msanxiety/tree/main/scripts/FINAL_scripts_clean/clean_dac_pull_icd10_codes_and_make_clean_df_post_replication.R)
+[make_combined_spreadsheet_for_cnb_paper.Rmd](https://github.com/Baller-Lab/ms_cnb_2026/scripts/make_combined_spreadsheet_for_cnb_paper.Rmd)
 
 ### Automated white matter lesion segmentation
 
@@ -98,13 +98,13 @@ Valcarcel AM, Linn KA, Vandekar SN, Satterthwaite TD, Muschelli J, Calabresi PA,
 To obtain a measure of total brain volume (minus CSF), I used FSL's fast on all T1w images (post n4 and ws). I then summed the grey matter and white matter volume to create a measure of total brain volume (total_volume).
 
 Wrapper script:
-[get_fast_total_brain_volume_all_subjs.sh](https://github.com/Baller-Lab/)
+[get_fast_total_brain_volume_all_subjs.sh](https://github.com/Baller-Lab/scripts/fast/get_fast_total_brain_volume_all_subjs.sh)
 
 Segmentation script:
-[make_fast_files_single_subj_pmacs.sh](https://github.com/Baller-Lab/)
+[make_fast_files_single_subj_pmacs.sh](https://github.com/Baller-Lab/scripts/fast/make_fast_files_single_subj.sh)
 
 Volume calculation script:
-[make_fast_volume_csv.sh](https://github.com/Baller-Lab/)
+[make_fast_volume_csv.sh](https://github.com/Baller-Lab/scripts/fast/make_fast_volume_csv.sh)
 
 ### Thalamus Segmentation
 
