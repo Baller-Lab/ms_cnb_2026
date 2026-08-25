@@ -26,7 +26,7 @@ K23 Multiple Sclerosis Cohort (collected between July 1, 2023 and April 30, 2026
 [https://github.com/Baller-Lab/ms_cnb_2026/](https://github.com/Baller-Lab/ms_cnb_2026)
 
 ### Website
-[https://Baller-Lab.github.io/ms_cnb_2026/](https://Baller-Lab.github.io/ms_cnb_2026/)
+[https://Baller-Lab.github.io/ms_cnb_2026/](https://Baller-Lab.github.io/ms_cnb_2026)
 
 ### Slack Channel:
 #ms-lesion_count_and_mimosa
