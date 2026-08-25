@@ -90,10 +90,10 @@ After lesions were segmented with MIMoSA, we calculated the overall volume of wh
 
 ### Lesion Count
 We then used the PennSIVE pipelines to do lesion count:
-[run_lesion_count.sh](https://github.com/Baller-Lab/tree/main/scripts/lesion_count/run_lesion_count.sh)
+[run_lesion_count.sh](https://github.com/Baller-Lab/blob/main/scripts/lesion_count/run_lesion_count.sh)
 
 And tabulate the results in a .csv.
-[create_lesion_count_csv.sh](https://github.com/Baller-Lab/tree/main/scripts/lesion_count/create_lesion_count_csv.sh)
+[create_lesion_count_csv.sh](https://github.com/Baller-Lab/blob/main/scripts/lesion_count/create_lesion_count_csv.sh)
 
 ### Brain segmentation
 
