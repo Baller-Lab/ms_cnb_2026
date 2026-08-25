@@ -77,13 +77,13 @@ Volume of all lesions (NOT fascicles) for each subject (cluster):
 <br>
 
 ### * Functions for project *
-[ms_functions.R](https://github.com/Baller-Lab/msanxiety/tree/main/scripts/jama_scripts/ms_functions.R)
+[ms_functions.R](https://github.com/Baller-Lab/ms_cnb_2026/scripts/msdep_prospective_functions.R)
 
 ### Sample Construction
 
-We first constructed our sample from n=890 individuals who were diagnosed with multiple sclerosis by a Multiple Sclerosis provider and received their clinical scans at the University of Pennsylvania. 
+We first constructed our sample from n=125 individuals who were diagnosed with multiple sclerosis by a Multiple Sclerosis provider and who had CNB. 
 
-The following code takes the n=825 sample, and goes through a variety of exclusions to get the final n. Specifically, after excluding 11 participants with poor mimosa quality (23) or streamline filtering (55), 814 participants were eligible for anxiety classification.  Participants with MS were identified from the electronic medical record and stratified into three age- and sex-matched groups: 1) MS without anxiety (MS+noA); 2) MS with mild anxiety (MS+mildA), 3) MS with severe anxiety (MS+severeA). MS+noA included persons who had no psychiatric diagnosis, took no psychiatric medications, and were asymptomatic on PHQ 2/9 (n = 99, age (SD) = 49.4 (11.7), % female = 75). MS+mildA included persons with either a diagnosis of an anxiety disorder (F40*) or a prescription for an anti-anxiety medication (n = 249, age (SD) = 47.1 (11.1), % female = 82). MS+severeA included persons who had both an anxiety disorder and were taking an anti-anxiety medication (n = 24, age (SD) = 47.0 (12.2), % female = 79).
+Of these The following code takes the n=825 sample, and goes through a variety of exclusions to get the final n. Specifically, after excluding 11 participants with poor mimosa quality (23) or streamline filtering (55), 814 participants were eligible for anxiety classification.  Participants with MS were identified from the electronic medical record and stratified into three age- and sex-matched groups: 1) MS without anxiety (MS+noA); 2) MS with mild anxiety (MS+mildA), 3) MS with severe anxiety (MS+severeA). MS+noA included persons who had no psychiatric diagnosis, took no psychiatric medications, and were asymptomatic on PHQ 2/9 (n = 99, age (SD) = 49.4 (11.7), % female = 75). MS+mildA included persons with either a diagnosis of an anxiety disorder (F40*) or a prescription for an anti-anxiety medication (n = 249, age (SD) = 47.1 (11.1), % female = 82). MS+severeA included persons who had both an anxiety disorder and were taking an anti-anxiety medication (n = 24, age (SD) = 47.0 (12.2), % female = 79).
 
 [clean_dac_pull_icd10_codes_and_make_clean_df_post_replication.R](https://github.com/Baller-Lab/msanxiety/tree/main/scripts/FINAL_scripts_clean/clean_dac_pull_icd10_codes_and_make_clean_df_post_replication.R)
 
@@ -98,13 +98,13 @@ Valcarcel AM, Linn KA, Vandekar SN, Satterthwaite TD, Muschelli J, Calabresi PA,
 To obtain a measure of total brain volume (minus CSF), I used FSL's fast on all T1w images (post n4 and ws). I then summed the grey matter and white matter volume to create a measure of total brain volume (total_volume).
 
 Wrapper script:
-[get_fast_total_brain_volume_all_subjs.sh](https://github.com/Baller-Lab/msanxiety/tree/main/scripts/jama_scripts/get_fast_total_brain_volume_all_subjs.sh)
+[get_fast_total_brain_volume_all_subjs.sh](https://github.com/Baller-Lab/)
 
 Segmentation script:
-[make_fast_files_single_subj_pmacs.sh](https://github.com/Baller-Lab/msanxiety/tree/main/scripts/jama_scripts/make_fast_files_single_subj_pmacs.sh)
+[make_fast_files_single_subj_pmacs.sh](https://github.com/Baller-Lab/)
 
 Volume calculation script:
-[make_fast_volume_csv.sh](https://github.com/Baller-Lab/msanxiety/tree/main/scripts/jama_scripts/make_fast_volume_csv.sh)
+[make_fast_volume_csv.sh](https://github.com/Baller-Lab/)
 
 ### Thalamus Segmentation
 
@@ -114,7 +114,7 @@ Volume calculation script:
 
 This script is run locally, on R. It does all second level/group data analysis. Main steps summarized below.
 
-[MS_cnb_manuscript_FINAL.Rmd](https://github.com/Baller-Lab/msanxiety/tree/main/scripts/jama_scripts/MSAnxiety_manuscript_JAMA_revision_20250304_95_CI_FINAL.Rmd)
+[MS_cnb_manuscript_FINAL.Rmd](https://github.com/Baller-Lab/ms_cnb_2026scripts/cnb_lesion_structural_prl_final_analyses_pre_replication_20260818.Rmd)
 
 #### Overall Cognitive Results
 
