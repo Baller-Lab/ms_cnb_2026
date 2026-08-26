@@ -234,14 +234,16 @@ cog_domains_imaging <- combined_final %>%
 # ============================================================
 ## Total ACC and RT across all tasks
 
+### Compute overall accuracy/RT data
+
 Overall (not per-domain) summary of mean Accuracy vs mean RT, on the same per-subject
 `cog_domains_imaging$mean_acc_z`/`$mean_rt_z` used above, via `run_one_sample_t()` so
 the bar/CI are self-consistent the same way the domain plots are. This is a two-bar
 descriptive summary, not part of the 8-test FDR family above, so no significance
-testing/stars here -- just the mean and its 95% CI. Title dropped (per journal figure
-convention -- the description belongs in the manuscript's figure legend, not baked
-into the image).
-```{r}
+testing/stars here -- just the mean and its 95% CI. Data only in this chunk --
+plotting happens below, once the domain data (and the shared y-axis range across all
+5 panels) are also available.
+```{r overall_acc_rt_data}
 overall_acc_rt_data <- bind_rows(
   run_one_sample_t(cog_domains_imaging$mean_acc_z, label = "mean_acc_z") %>% mutate(Metric = "Accuracy"),
   run_one_sample_t(cog_domains_imaging$mean_rt_z,  label = "mean_rt_z")  %>% mutate(Metric = "Response Time")
@@ -253,45 +255,6 @@ overall_acc_rt_data <- bind_rows(
   )
 
 overall_acc_rt_data
-
-overall_acc_rt_ylim <- c(
-  min(overall_acc_rt_data$total_mean_z_score - overall_acc_rt_data$ci95_half_width) - 0.1,
-  max(overall_acc_rt_data$total_mean_z_score + overall_acc_rt_data$ci95_half_width) + 0.1
-)
-
-total_mean_plot <- ggplot(overall_acc_rt_data, aes(x = Metric, y = total_mean_z_score, fill = Metric)) +
-  geom_bar(stat = "identity", width = 0.7) +
-  geom_errorbar(aes(ymin = total_mean_z_score - ci95_half_width, ymax = total_mean_z_score + ci95_half_width),
-                position = position_dodge(width = 0.6), width = 0.2, linewidth = 0.7) +
-  labs(y = "Mean z-score (+/- 95% C.I.)", x = "Metric") +
-  theme_classic() +
-  theme(
-    axis.text.x = element_text(angle = 0, hjust = 0.5, size = 14, color = "black"),
-    axis.text.y = element_text(size = 11, color = "black"),
-    axis.title.x = element_blank(),
-    axis.title.y = element_text(size = 14, margin = margin(r = 10)),
-    legend.position = "none",
-    axis.text = element_text(size = 14, color = "black"),
-    axis.line = element_line(size = 1),
-    panel.background = element_rect(color = "white"),
-    panel.grid = element_blank()
-  ) +
-  scale_y_continuous(limits = overall_acc_rt_ylim) +
-  scale_fill_manual(values = c("Accuracy" = "#5A80C7", "Response Time" = "goldenrod1"))
-
-# Print the plot
-total_mean_plot
-
-# Suggested manuscript figure legend:
-#   "Overall cognitive performance across all tasks. Bar plot shows the mean z score
-#    (+/- 95% confidence interval) for accuracy and response time, averaged across all
-#    cognitive tasks, in the total imaged cohort (n = 124). Error bars represent 95%
-#    confidence intervals."
-
-# Save the plot
-ggsave(paste0(homedir, "results/total_mean_plot.pdf"), plot = total_mean_plot, height = 6, width = 5)
-
-
 ```
 
 ## Cognitive domain behavioral analyses
@@ -340,18 +303,66 @@ domain_acc_rt_data <- map_dfr(names(domain_metric_outcomes), function(domain) {
 domain_acc_rt_data
 ```
 
-### Build and combine the 4 domain plots
+### Shared y-axis limits across all 5 plots
 
-Shared y-axis limits (computed from the actual data, including room for the
-significance stars, with a little padding) so all four panels are directly comparable
-on the same figure instead of each autoscaling to its own domain.
-```{r domain_acc_rt_plots}
+Both data frames (`overall_acc_rt_data`, `domain_acc_rt_data`) are now built, so the
+shared range for all 5 panels (overall + 4 domains) can be computed once, up front, as
+the union of both -- min/max of mean +/- CI, plus the domain plots' `star_y` (room for
+the significance asterisks), with a little padding. Using one range for every panel
+below keeps them directly comparable instead of each autoscaling on its own.
+```{r shared_acc_rt_ylim}
 y_pad <- 0.15
-domain_acc_rt_ylim <- c(
-  min(c(domain_acc_rt_data$total_mean_z_score - domain_acc_rt_data$ci95_half_width, domain_acc_rt_data$star_y)) - y_pad,
-  max(c(domain_acc_rt_data$total_mean_z_score + domain_acc_rt_data$ci95_half_width, domain_acc_rt_data$star_y)) + y_pad
+shared_acc_rt_ylim <- c(
+  min(c(overall_acc_rt_data$total_mean_z_score - overall_acc_rt_data$ci95_half_width,
+        domain_acc_rt_data$total_mean_z_score  - domain_acc_rt_data$ci95_half_width,
+        domain_acc_rt_data$star_y)) - y_pad,
+  max(c(overall_acc_rt_data$total_mean_z_score + overall_acc_rt_data$ci95_half_width,
+        domain_acc_rt_data$total_mean_z_score  + domain_acc_rt_data$ci95_half_width,
+        domain_acc_rt_data$star_y)) + y_pad
 )
+```
 
+### Overall accuracy/RT plot
+
+Title dropped (per journal figure convention -- the description belongs in the
+manuscript's figure legend, not baked into the image).
+```{r total_mean_plot}
+total_mean_plot <- ggplot(overall_acc_rt_data, aes(x = Metric, y = total_mean_z_score, fill = Metric)) +
+  geom_bar(stat = "identity", width = 0.7) +
+  geom_errorbar(aes(ymin = total_mean_z_score - ci95_half_width, ymax = total_mean_z_score + ci95_half_width),
+                position = position_dodge(width = 0.6), width = 0.2, linewidth = 0.7) +
+  labs(y = "Mean z-score (+/- 95% C.I.)", x = "Metric") +
+  theme_classic() +
+  theme(
+    axis.text.x = element_text(angle = 0, hjust = 0.5, size = 14, color = "black"),
+    axis.text.y = element_text(size = 11, color = "black"),
+    axis.title.x = element_blank(),
+    axis.title.y = element_text(size = 14, margin = margin(r = 10)),
+    legend.position = "none",
+    axis.text = element_text(size = 14, color = "black"),
+    axis.line = element_line(size = 1),
+    panel.background = element_rect(color = "white"),
+    panel.grid = element_blank()
+  ) +
+  scale_y_continuous(limits = shared_acc_rt_ylim) +
+  scale_fill_manual(values = c("Accuracy" = "#5A80C7", "Response Time" = "goldenrod1"))
+
+# Print the plot
+total_mean_plot
+
+# Suggested manuscript figure legend:
+#   "Overall cognitive performance across all tasks. Bar plot shows the mean z score
+#    (+/- 95% confidence interval) for accuracy and response time, averaged across all
+#    cognitive tasks, in the total imaged cohort (n = 124). Error bars represent 95%
+#    confidence intervals."
+
+# Save the plot
+ggsave(paste0(homedir, "results/total_mean_plot.pdf"), plot = total_mean_plot, height = 6, width = 5)
+ggsave(paste0(homedir, "results/total_mean_plot.png"), plot = total_mean_plot, height = 6, width = 5)
+```
+
+### Build and combine the 4 domain plots
+```{r domain_acc_rt_plots}
 make_domain_acc_rt_plot <- function(domain_label) {
   ggplot(domain_acc_rt_data %>% filter(Domain == domain_label),
          aes(x = Metric, y = total_mean_z_score, fill = Metric)) +
@@ -373,7 +384,7 @@ make_domain_acc_rt_plot <- function(domain_label) {
       panel.background = element_rect(color = "white"),
       panel.grid = element_blank()
     ) +
-    scale_y_continuous(limits = domain_acc_rt_ylim) +
+    scale_y_continuous(limits = shared_acc_rt_ylim) +
     scale_fill_manual(values = c("Accuracy" = "#5A80C7", "Response Time" = "goldenrod1"))
 }
 
@@ -399,6 +410,7 @@ domain_acc_rt_combined
 
 # Save the combined figure
 ggsave(paste0(homedir, "results/domain_acc_rt_combined_plot.pdf"), plot = domain_acc_rt_combined, height = 8, width = 8)
+ggsave(paste0(homedir, "results/domain_acc_rt_combined_plot.png"), plot = domain_acc_rt_combined, height = 8, width = 8)
 ```
 
 
@@ -623,6 +635,10 @@ cog_table_for_viewing_simple
 
 #### WOULD SAVE THIS YOURSELF TO check###
 #save_kable(cog_table_for_viewing_simple, file = paste0(homedir, "results/cog_domain_summary_table_simple.html"), self_contained = FALSE)
+kableExtra::save_kable(
+  cog_table_for_viewing_simple, 
+  file = paste0(homedir, "results/cog_domain_summary_table_simple.png")
+)
 
 ```
 
