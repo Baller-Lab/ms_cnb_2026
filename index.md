@@ -136,7 +136,7 @@ Assemble all thalamic segmentations into a csv:
 ### Combining groups
 Of the n=125 in our sample, n=103 had good T1 scans that were used for FAST segmentation and thalamic segmentation. n=102 had good T1s and FLAIRs (one person had missing FLAIR). n=27 had PRL data. In our combining script, all data were combined in a spreadsheet (with CNB, demos), and deidentified. This output csv was then taken to the full analysis script. 
 
-[make_combined_spreadsheet_for_cnb_paper.Rmd](https://github.com/Baller-Lab/ms_cnb_2026/tree/main/scripts/make_combined_spreadsheet_for_cnb_paper.Rmd)
+[make_combined_spreadsheet_for_cnb_paper.Rmd](https://github.com/Baller-Lab/ms_cnb_2026/tree/main/scripts/make_combined_spreadsheet_added_demos_20260915.Rmd)
 
 ### Final group level analysis
 
