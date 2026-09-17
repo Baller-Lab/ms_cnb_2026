@@ -119,14 +119,14 @@ run_item_imaging_lm<- function(items, img_predictors, data, exclude_zero = FALSE
         n         = map_dbl(glance, ~ if (nrow(.x) == 0) NA_real_ else .x$nobs),
         r2        = map_dbl(glance, ~ if (nrow(.x) == 0) NA_real_ else .x$r.squared),
         adj_r2    = map_dbl(glance, ~ if (nrow(.x) == 0) NA_real_ else .x$adj.r.squared),
-        df_resid  = map_dbl(glance, ~ if (nrow(.x) == 0) NA_real_ else .x$df.residual),
-        partial_r = statistic / sqrt(statistic^2 + df_resid),
+        df_residual  = map_dbl(glance, ~ if (nrow(.x) == 0) NA_real_ else .x$df.residual), # changing name to df_residual for consistency with make_col - EAH 9/17/2026
+        partial_r = statistic / sqrt(statistic^2 + df_residual), # changing name to df_residual for consistency with make_col - EAH 9/17/2026
         d         = 2 * partial_r / sqrt(1 - partial_r^2),
         p_fdr     = p.adjust(p_value, method = "fdr"),
         p_bonf    = p.adjust(p_value, method = "bonferroni"),
         F_value   = map_dbl(glance, ~ if (nrow(.x) == 0) NA_real_ else .x$statistic), #whole-model F-test (glance() already computes this, no need for summary(.x)$fstatistic)
         F_df1     = map_dbl(glance, ~ if (nrow(.x) == 0) NA_real_ else .x$df),
-        F_df2     = df_resid,
+        F_df2     = df_residual, # changing name to df_residual for consistency with make_col - EAH 9/17/2026
         F_p_value = map_dbl(glance, ~ if (nrow(.x) == 0) NA_real_ else .x$p.value),
         F_fdr     = p.adjust(F_p_value, method = "fdr")
       )
@@ -231,9 +231,8 @@ print_dep_table <- function(data, caption_label) {
 }
 
 # format helper: "t(p), d=X.XX*" with * if FDR < 0.05
-fmt_tp <- function(t, p, fdr, n) {
+fmt_tp <- function(t, p, fdr, df) { # passing df here directly rather than computing it via n - EAH 9/17/2026
   stars <- ifelse(!is.na(fdr) & fdr < 0.05, "*", "")
-  df <- n - 3
   partial_r <- t / sqrt(t^2 + df)
   d <- 2 * partial_r / sqrt(1 - partial_r^2)
   ifelse(is.na(t), "—",
@@ -245,8 +244,8 @@ fmt_tp <- function(t, p, fdr, n) {
 make_col <- function(results, predictor) {
   results %>%
     filter(imaging_measure == predictor) %>%
-    select(outcome, statistic, p_value, p_fdr, n) %>%
-    mutate(cell = fmt_tp(statistic, p_value, p_fdr, n)) %>%
+    select(outcome, statistic, p_value, p_fdr, n, df_residual) %>% # add df_residual - EAH 9/17/2026
+    mutate(cell = fmt_tp(statistic, p_value, p_fdr, df_residual)) %>% # pass df_residual, remove n - EAH 9/17/2026
     select(outcome, cell)
 }
 
@@ -259,8 +258,7 @@ get_n <- function(results, predictor) {
     round()
 }
 
-fmt_tp_nostar <- function(t, p, n) {
-  df <- n - 3
+fmt_tp_nostar <- function(t, p, df) { # passing df here directly rather than computing it via n - EAH 9/17/2026
   partial_r <- t / sqrt(t^2 + df)
   d <- 2 * partial_r / sqrt(1 - partial_r^2)
   ifelse(is.na(t), "—",
@@ -270,8 +268,8 @@ fmt_tp_nostar <- function(t, p, n) {
 make_col_nostar <- function(results, predictor) {
   results %>%
     filter(imaging_measure == predictor) %>%
-    select(outcome, statistic, p_value, n) %>%
-    mutate(cell = fmt_tp_nostar(statistic, p_value, n)) %>%
+    select(outcome, statistic, p_value, n, df_residual) %>% # add df_residual - EAH 9/17/2026
+    mutate(cell = fmt_tp_nostar(statistic, p_value, df_residual)) %>% # pass df_residual, remove n - EAH 9/17/2026
     select(outcome, cell)
 }
 
