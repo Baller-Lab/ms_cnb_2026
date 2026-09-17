@@ -136,13 +136,13 @@ Assemble all thalamic segmentations into a csv:
 ### Combining groups
 Of the n=125 in our sample, n=103 had good T1 scans that were used for FAST segmentation and thalamic segmentation. n=102 had good T1s and FLAIRs (one person had missing FLAIR). n=27 had PRL data. In our combining script, all data were combined in a spreadsheet (with CNB, demos), and deidentified. This output csv was then taken to the full analysis script. 
 
-[make_combined_spreadsheet_for_cnb_paper.Rmd](https://github.com/Baller-Lab/ms_cnb_2026/blob/main/scripts/make_combined_spreadsheet_added_demos_20260915.Rmd)
+[make_combined_spreadsheet_for_cnb_paper.Rmd](https://github.com/Baller-Lab/ms_cnb_2026/blob/main/scripts/make_combined_spreadsheet_for_cnb_paper_post_replication.Rmd)
 
 ### Final group level analysis
 
 This script is run locally, on R. It does all second level/group data analysis. Main steps summarized below.
 
-[cnb_lesion_structural_prl_final_analyses_pre_replication_20260818.Rmd](https://github.com/Baller-Lab/ms_cnb_2026/tree/main/scripts/cnb_lesion_structural_prl_final_analyses_pre_replication_20260818.Rmd)
+[cnb_lesion_structural_prl_final_analyses_post_replication_20260917.Rmd](https://github.com/Baller-Lab/ms_cnb_2026/tree/main/scripts/cnb_lesion_structural_prl_final_analyses_post_replication_20260917.Rmd)
 
 #### Overall Cognitive Results
 ![overall_mean_accuracy_and_rt](results/total_mean_plot.png)
