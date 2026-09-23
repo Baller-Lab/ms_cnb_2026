@@ -49,10 +49,15 @@ rownames(cnb_data) <- NULL #n=128
 names(cnb_data)[names(cnb_data) == "test_sessions.subid"] <- "bblid"
 
 
-#clean
+#clean -- a few participants are longitudinal (more than one CNB session); keep each person's earliest
+#dotest is read in as text (YYYY-MM-DD), so convert to a real date first -- as.Date() errors if the
+#format ever changes, rather than silently sorting alphabetically
 cnb_data <- cnb_data %>%
-   arrange(bblid, test_sessions_v.dotest) %>%
-   distinct(bblid, .keep_all = TRUE)#n=127
+   mutate(test_sessions_v.dotest = as.Date(test_sessions_v.dotest)) %>%
+   group_by(bblid) %>%
+   slice_min(test_sessions_v.dotest, n = 1, with_ties = FALSE) %>%
+   ungroup() %>%
+   as.data.frame() #n=127
 
 names(cnb_data) <- gsub(x=names(cnb_data), pattern = "\\PCET_A\\.", replacement = "PCET\\.")
 ```
@@ -72,8 +77,13 @@ redcap_data <- redcap_data %>%
          bdi_ii_18 = as.numeric(gsub("[ab]", "", bdi_ii_18)),
          promis_ms_physfunc_15a_calc = rowSums(across(matches("^promis_ms_physfunc_15a_[0-9]+$"))),
          promis_ms_fatigue_8a_calc   = rowSums(across(matches("^promis_ms_fatigue_8a_[0-9]+$")))) %>%
-  arrange(bblid, date) %>%
-  distinct(bblid, .keep_all = TRUE) #n=127
+  #longitudinal participants have more than one redcap row; keep each person's earliest
+  #date is read in as text (YYYY-MM-DD) -- convert to a real date first so the ordering is by date, not alphabetical
+  mutate(date = as.Date(date)) %>%
+  group_by(bblid) %>%
+  slice_min(date, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
+  as.data.frame() #n=127
   
 ```
 
@@ -136,6 +146,14 @@ names(mrn_to_bblid)[names(mrn_to_bblid) == "BBLID"] <- "bblid"
 mrn_to_empi <- read.csv(paste0(homedir, "data/name_mrn_empi.csv"), sep = ",", header = TRUE)
 names(mrn_to_empi)[1] <- "NAME"
 
+#longitudinal participants were pulled once per visit, so a few people are listed more than once as
+#identical copies -- without this, the MRN merge below doubles them (60637, 60589, 60587 were each
+#in the final spreadsheet twice). Drop exact-duplicate rows only.
+mrn_to_empi <- mrn_to_empi[!duplicated(mrn_to_empi), ]
+
+#stop if any MRN is still listed twice, i.e. the same MRN with a different name or EMPI
+stopifnot(!any(duplicated(mrn_to_empi$MRN)))
+
 ```
 
 #Combine
@@ -147,8 +165,8 @@ mrn_to_empi$MRN_clean  <- str_remove(as.character(mrn_to_empi$MRN),  "^0+")
 
 mrn_empi_bblid_merged <- merge(mrn_to_bblid, mrn_to_empi, by = "MRN_clean")
 
-#keep NAME (from mrn_to_empi) so it can be dropped at the de-identify step; drop the duplicate Participant.Name from mrn_to_bblid
-mrn_empi_bblid <- mrn_empi_bblid_merged %>% select(EMPI, MRN_clean, bblid, NAME)
+#drop names (NAME from mrn_to_empi, Participant.Name from mrn_to_bblid) -- only the IDs are needed for merging
+mrn_empi_bblid <- mrn_empi_bblid_merged %>% select(EMPI, MRN_clean, bblid)
 ```
 
 ## Combine behavioral data
@@ -156,14 +174,14 @@ mrn_empi_bblid <- mrn_empi_bblid_merged %>% select(EMPI, MRN_clean, bblid, NAME)
 #demo_cnb_data <- cnb_data # keeping this way while I sort out the merging issuemerge(demographics, cnb_data, by = "bblid", all = TRUE) #n=137
 demo_cnb_data <- merge(demographics, cnb_data, by = "bblid", all = TRUE) #n=150 - keep all rows
 demo_cnb_redcap_data <- merge(demo_cnb_data, redcap_data, by = "bblid", all = TRUE) #n=151 - keep all rows
-all_behavioral_data <- merge(demo_cnb_redcap_data, mrn_empi_bblid, by = "bblid") #n=125 - keep only rows that overlap in both groups
+all_behavioral_data <- merge(demo_cnb_redcap_data, mrn_empi_bblid, by = "bblid") #n=122 - keep only rows that overlap in both groups
 names(all_behavioral_data)[names(all_behavioral_data) == "MRN_clean"] <- "MRN"
 
 # drop anyone without actual CNB data -- test_sessions_v.dotest is only populated for a
 # completed CNB session, so this catches people who have demographics/imaging but never
 # took the CNB battery (e.g. bblid 11117), who the all=TRUE merges above kept around
 all_behavioral_data <- all_behavioral_data %>%
-  filter(!is.na(test_sessions_v.dotest)) #n=124
+  filter(!is.na(test_sessions_v.dotest)) #n=121
 ```
 
 ## Combine PRL data
@@ -173,22 +191,22 @@ all_behavioral_data <- all_behavioral_data %>%
   #select(bblid, prl.count, prl.volume..mm3., COMPLETED.CNB., DATE.COMPLETED.CNB, Closest.7T.scan)
 
 prl_data$MRN <- str_remove(as.character(prl_data$MRN), "^0+")
-cnb_redcap_prl_data <- merge(all_behavioral_data, prl_data, by = "MRN", all.x = TRUE)  #n=124
+cnb_redcap_prl_data <- merge(all_behavioral_data, prl_data, by = "MRN", all.x = TRUE)  #n=121
 
 ```
 
 ## Combine imaging data (mimosa volumes, counts, segmentations) with rest of data
 ```{r}
-cnb_prl_lesion_data <- merge(cnb_redcap_prl_data, lesion_volume_df, by = "EMPI", all.x = TRUE) #n=125
+cnb_prl_lesion_data <- merge(cnb_redcap_prl_data, lesion_volume_df, by = "EMPI", all.x = TRUE) #n=121
 
 # merge on EMPI + EXAM_DATE (not just EMPI) since fast_df also carries its own EXAM_DATE
 # column -- merging on EMPI alone would silently rename both to EXAM_DATE.x/EXAM_DATE.y
 # instead of keeping a single column for the later segmentations merge to key on
-cnb_prl_lesion_volumes_data <- merge(cnb_prl_lesion_data, fast_df, by = c("EMPI", "EXAM_DATE"), all.x = TRUE) #n=125
+cnb_prl_lesion_volumes_data <- merge(cnb_prl_lesion_data, fast_df, by = c("EMPI", "EXAM_DATE"), all.x = TRUE) #n=121
 
-cnb_prl_lesion_volumes_counts_data <- merge(cnb_prl_lesion_volumes_data, lesion_count_df, by = "EMPI", all.x = TRUE) #n=125
+cnb_prl_lesion_volumes_counts_data <- merge(cnb_prl_lesion_volumes_data, lesion_count_df, by = "EMPI", all.x = TRUE) #n=121
 
-cnb_prl_lesion_volumes_segs_data <- merge(cnb_prl_lesion_volumes_counts_data, segmentations, by = c("EMPI", "EXAM_DATE"), all.x = TRUE) #n=125
+cnb_prl_lesion_volumes_segs_data <- merge(cnb_prl_lesion_volumes_counts_data, segmentations, by = c("EMPI", "EXAM_DATE"), all.x = TRUE) #n=121
 
 #make thalamus by ICV column
 cnb_prl_lesion_volumes_segs_data$Thalamus_total_by_icv <- cnb_prl_lesion_volumes_segs_data$Thalamus_total_openmap_seg/cnb_prl_lesion_volumes_segs_data$intracranial_volume
@@ -262,9 +280,16 @@ write.csv(combined_deidentified, file = paste0(homedir, "data/cnb_prl_mimosa_str
 
 #De-identify
 ```{r}
-#remove MRN and EMPI, keep BBLID
+#remove MRN, EMPI, and any name columns, keep BBLID
+#name columns can come in from more than one source (e.g. the PRL list carries its own, read in
+#as "X...NAME" because of a byte-order-mark), so drop by pattern rather than by exact name.
+#case-sensitive on purpose -- "NAME"/"Participant.Name" only, so meds_names_only/meds_name_and_dose stay
+name_cols <- grep("NAME|Participant\\.Name", names(combined_final), value = TRUE)
 combined_deidentified <- combined_final %>%
-  select(-MRN, -EMPI)
+  select(-MRN, -EMPI, -all_of(name_cols))
+
+#stop before writing if any identifier column survived
+stopifnot(!any(grepl("NAME|Participant\\.Name|^MRN|^EMPI", names(combined_deidentified))))
 
 write.csv(combined_deidentified, file = paste0(homedir, "data/cnb_goa_prl_mimosa_streamline_filtering_dep_net_deid.csv"))
 ```
