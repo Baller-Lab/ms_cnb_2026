@@ -7,7 +7,7 @@
 Erica B. Baller
 
 ### Brief Project Description:
-125 participants with MS were included (75.8%F, mean age 43.1). Cognitive assessments with CNB were performed and summarized by overall accuracy and speed, and by cognitive domain. Patterns of cognitive disease were then evaluated in relation to lesion burden (count and volume, n=102), GM, WM, and thalamic volume (n=103) from research-grade clinical scans, and PRL burden (count and volume, n=27) from 7T. 
+121 participants with MS were included (76%F, mean age 43.0). Cognitive assessments with CNB were performed and summarized by overall accuracy and speed, and by cognitive domain. Patterns of cognitive disease were then evaluated in relation to lesion burden (count and volume, n=101), GM, WM, and thalamic volume (n=102) from research-grade clinical scans, and PRL burden (count and volume, n=27) from 7T. 
 
 ### Authors/Collaborators:
 Erica B. Baller, M.D., M.S., Elizabeth A. Horwath, Ph.D., Millie R. Sach, B.A., Elena C. Cooper, B.A., Nikka Bakhtiar, M.S., Amit Bar-Or, M.D., Rachel B. Brandstadter, M.D., Ruben C. Gur, Ph.D., Dina A. Jacobs, M.D., Christopher M. Perrone, M.D., David R. Roalf, Ph.D., Kosha Ruparel, M.S.E., J. Cobb Scott, Ph.D., Theodore D. Satterthwaite, M.D., M.A., Russell T. Shinohara, Ph.D., Matthew K. Schindler, M.D., Ph.D. 
