@@ -24,6 +24,8 @@ Uses: pared-down extract of cnb_goa_prl_mimosa_streamline_filtering_deid_2026062
       cog_domain_summary_table chunk below, since it's not needed to produce the
       simplified table but may be useful again later.
 Dependencies: Using Rstudio version Version 2024.12.0+467 (2024.12.0+467); R v 4.4.2
+              Supplementary Analyses section also needs rstatix, emmeans, ggsignif
+              (called with pkg:: rather than library() so nothing gets masked)
 -->
 
 ```{r setup, include=FALSE}
@@ -38,9 +40,9 @@ library(kableExtra)
 homedir <- "~/Library/CloudStorage/Box-Box/BBL/ms_cnb_20260821/post_replication/"
 
 
-# shared helper functions (norming, item-level LMs, summary tables) -- same
-# source used by the full analysis doc, so results here stay consistent with it
-source(paste0(homedir, "scripts/msdep_prospective_functions.R"))
+# shared helper functions (norming, item-level LMs, summary tables, supp ANOVAs) --
+# MS-CNB-only subset of msdep_prospective_functions.R, see header of mscnb_functions.R
+source(paste0(homedir, "scripts/mscnb_functions.R"))
 ```
 
 # ============================================================
@@ -355,7 +357,7 @@ total_mean_plot
 # Suggested manuscript figure legend:
 #   "Overall cognitive performance across all tasks. Bar plot shows the mean z score
 #    (+/- 95% confidence interval) for accuracy and response time, averaged across all
-#    cognitive tasks, in the total imaged cohort (n = 124). Error bars represent 95%
+#    cognitive tasks, in all participants with CNB data (n = 121). Error bars represent 95%
 #    confidence intervals."
 
 # Save the plot
@@ -406,7 +408,7 @@ domain_acc_rt_combined
 #   "Cognitive performance by domain, relative to normative expectations. Bar plots
 #    show mean age- and sex-normed z scores (+/- 95% confidence interval) for accuracy
 #    and response time within each cognitive domain (Executive Function, Complex
-#    Cognition, Memory, Emotion) in the total imaged cohort (n = 124). Error bars
+#    Cognition, Memory, Emotion) in all participants with CNB data (n = 121). Error bars
 #    represent 95% confidence intervals. Asterisks (*) denote domains for which the
 #    mean z score differed significantly from 0 (one-sample t test) after false
 #    discovery rate (FDR) correction (q < 0.05) across all 8 domain-by-metric
@@ -612,8 +614,8 @@ col_names_simple <- c(
   paste0("GM Volume (n=",       get_n(cog_imaging_results,     "gm_volume"), ")"),
   paste0("WM Volume (n=",       get_n(cog_imaging_results,     "wm_volume"), ")"),
   paste0("Thalamic Volume (n=", get_n(cog_imaging_results, "Thalamus_total_openmap_seg"), ")"),
-  paste0("Lesion Count (n=",    get_n(cog_imaging_results,     "lesion_count"), ")"),
-  paste0("Lesion Volume (n=",   get_n(cog_imaging_results,     "volume_of_mimosa_lesions"), ")"),
+  paste0("WM Lesion Count (n=",    get_n(cog_imaging_results,     "lesion_count"), ")"),
+  paste0("WM Lesion Volume (n=",   get_n(cog_imaging_results,     "volume_of_mimosa_lesions"), ")"),
   paste0("PRL Count (n=",       get_n(prl_domain_results,      "prl.count"), ")"),
   paste0("PRL Volume (n=",      get_n(prl_domain_results,      "prl.volume..mm3."), ")")
 )
@@ -648,8 +650,93 @@ kableExtra::save_kable(
 cog_summary_table_simple_export <- cog_summary_table_simple
 names(cog_summary_table_simple_export) <- col_names_simple
 write.csv(cog_summary_table_simple_export,
-          file = paste0(homedir, "results/Table2_cog_domain_summary_table_simpleT.csv"),
+          file = paste0(homedir, "results/Table2_cog_domain_summary_table_simple.csv"),
           row.names = FALSE)
 
 ```
 
+# ============================================================
+# Supplementary Analyses
+# ============================================================
+
+## Cognitive domain accuracy anova
+```{r supp_acc_domain_anova}
+## Runs an anova across all accuracy domains to determine if there are significant differences, and then runs posthoc analyses
+
+# Domains are within-subject (every participant contributes a score to all 4), so
+# this is a one-way *repeated-measures* ANOVA (subject as the error stratum), not a
+# between-groups ANOVA -- treating the 4 domains as independent groups would ignore
+# that the same people are in every group. Sphericity: rstatix::anova_test runs
+# Mauchly's test, and get_anova_table(correction = "auto") applies the
+# Greenhouse-Geisser correction only when Mauchly's is significant.
+# Post hoc: all pairwise domain contrasts from the same RM model via emmeans, with
+# Tukey adjustment -- only run when the omnibus ANOVA is significant (p < 0.05).
+# Helper functions (make_supp_domain_long, run_supp_domain_anova, make_supp_domain_plot)
+# live in mscnb_functions.R; supp_domain_cols below is reused by the RT chunk.
+
+# domain label -> per-subject domain z-score column, in plotting order
+supp_domain_cols <- list(
+  Accuracy = c(`Executive Function` = "ef_acc", `Complex Cognition` = "cc_acc",
+               Memory = "mem_acc", Emotion = "emo_acc"),
+  `Response Time` = c(`Executive Function` = "ef_rt", `Complex Cognition` = "cc_rt",
+                      Memory = "mem_rt", Emotion = "emo_rt")
+)
+
+# ---- Accuracy ----
+supp_acc_long  <- make_supp_domain_long(supp_domain_cols$Accuracy, cog_domains_imaging)
+supp_acc_anova <- run_supp_domain_anova(supp_acc_long)
+
+cat("Accuracy domains, repeated-measures ANOVA (n =", supp_acc_anova$n, ")\n")
+supp_acc_anova$mauchly
+supp_acc_anova$anova
+if (!is.null(supp_acc_anova$posthoc)) supp_acc_anova$posthoc else cat("Omnibus ANOVA not significant -- no post hoc tests run.\n")
+
+supp_acc_domain_plot <- make_supp_domain_plot(supp_acc_long, supp_acc_anova, fill_color = "#5A80C7")
+supp_acc_domain_plot
+
+# Suggested supplementary figure legend:
+#   "Accuracy by cognitive domain. Bars show mean age- and sex-normed accuracy z scores
+#    (+/- 95% confidence interval) for each cognitive domain in all participants with CNB data (n = 121).
+#    Domains were compared with a one-way repeated-measures ANOVA; brackets denote
+#    pairwise differences significant after Tukey adjustment
+#    (* p < 0.05, ** p < 0.01, *** p < 0.001)."
+
+ggsave(paste0(homedir, "results/supp_fig_acc_domain_anova.pdf"), plot = supp_acc_domain_plot, height = 6, width = 9)
+ggsave(paste0(homedir, "results/supp_fig_acc_domain_anova.png"), plot = supp_acc_domain_plot, height = 6, width = 9)
+
+# Plain-text ANOVA + post hoc results for pulling values into the manuscript
+write.csv(supp_acc_anova$anova, paste0(homedir, "results/supp_acc_domain_anova.csv"), row.names = FALSE)
+if (!is.null(supp_acc_anova$posthoc)) write.csv(supp_acc_anova$posthoc, paste0(homedir, "results/supp_acc_domain_tukey.csv"), row.names = FALSE)
+```
+
+## Cognitive domain RT anova
+```{r supp_rt_domain_anova}
+## Runs an anova across all RT domains to determine if there are significant differences, and then runs posthoc analyses
+
+# Same approach and helpers (mscnb_functions.R) as the accuracy chunk above:
+# RM ANOVA, GG correction if sphericity is violated, Tukey post hoc only when the omnibus is significant.
+# Reminder: RT z-scores were multiplied by -1 at scoring, so negative = slower.
+supp_rt_long  <- make_supp_domain_long(supp_domain_cols$`Response Time`, cog_domains_imaging)
+supp_rt_anova <- run_supp_domain_anova(supp_rt_long)
+
+cat("RT domains, repeated-measures ANOVA (n =", supp_rt_anova$n, ")\n")
+supp_rt_anova$mauchly
+supp_rt_anova$anova
+if (!is.null(supp_rt_anova$posthoc)) supp_rt_anova$posthoc else cat("Omnibus ANOVA not significant -- no post hoc tests run.\n")
+
+supp_rt_domain_plot <- make_supp_domain_plot(supp_rt_long, supp_rt_anova, fill_color = "goldenrod1")
+supp_rt_domain_plot
+
+# Suggested supplementary figure legend:
+#   "Response time by cognitive domain. Bars show mean age- and sex-normed response time
+#    z scores (+/- 95% confidence interval; negative values indicate slower responses)
+#    for each cognitive domain in all participants with CNB data (n = 121). Domains were compared with a
+#    one-way repeated-measures ANOVA; brackets denote pairwise differences significant
+#    after Tukey adjustment (* p < 0.05, ** p < 0.01, *** p < 0.001)."
+
+ggsave(paste0(homedir, "results/supp_fig_rt_domain_anova.pdf"), plot = supp_rt_domain_plot, height = 6, width = 9)
+ggsave(paste0(homedir, "results/supp_fig_rt_domain_anova.png"), plot = supp_rt_domain_plot, height = 6, width = 9)
+
+write.csv(supp_rt_anova$anova, paste0(homedir, "results/supp_rt_domain_anova.csv"), row.names = FALSE)
+if (!is.null(supp_rt_anova$posthoc)) write.csv(supp_rt_anova$posthoc, paste0(homedir, "results/supp_rt_domain_tukey.csv"), row.names = FALSE)
+```
