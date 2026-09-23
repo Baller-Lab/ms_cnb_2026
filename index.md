@@ -73,7 +73,7 @@ Volume of all lesions for each subject:
 
 ### * Functions for project *
 
-[msdep_prospective_functions.R](https://github.com/Baller-Lab/ms_cnb_2026/tree/main/scripts/msdep_prospective_functions.R)
+[mscnb_functions.R](https://github.com/Baller-Lab/ms_cnb_2026/tree/main/scripts/mscnb_functions.R)
 
 ### Sample Construction
 
