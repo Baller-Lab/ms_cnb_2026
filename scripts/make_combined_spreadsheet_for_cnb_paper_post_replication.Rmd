@@ -15,7 +15,7 @@ resultsdir <- paste0(homedir, "results/")
 ```
 #Pre: CNB, PRL, Lesion volume, mrn->empi, mrn->bblid mapping files
 #Post: Deidentified dataframe containing only the columns needed for
-#      cnb_lesion_structural_prl_final_analyses_pre_replication_20260818.Rmd (raw CNB
+#      cnb_lesion_structural_prl_final_analyses_post_replication_20260917.Rmd (raw CNB
 #      task columns for kosha z-scoring, lesion count/volume, GM/WM/CSF/total/ICV
 #      volumes, thalamic volume, PRL count/volume, plus bblid/age/gender/QA columns).
 #Uses: We will be bringing together a lot of files to make a master spreadsheet that can be used across many analyses. What is really important is that we combine separately so we protect patient data, and then create a deidentified dataset to save and use in other analyses.
@@ -79,8 +79,14 @@ redcap_data <- redcap_data %>%
          promis_ms_fatigue_8a_calc   = rowSums(across(matches("^promis_ms_fatigue_8a_[0-9]+$")))) %>%
   #longitudinal participants have more than one redcap row; keep each person's earliest
   #date is read in as text (YYYY-MM-DD) -- convert to a real date first so the ordering is by date, not alphabetical
-  mutate(date = as.Date(date)) %>%
+  mutate(date = as.Date(date),
+         msdep_dx_hx_ms_diagnosis = as.Date(na_if(msdep_dx_hx_ms_diagnosis, ""))) %>%
   group_by(bblid) %>%
+  #MS diagnosis date (not in the oracle pull) -- the question was only added to redcap in 2025, so for
+  #longitudinal participants it can sit on a later visit than the earliest one kept below. Take it from
+  #the earliest visit that has one (only 24660 reported two different dates, ~10 days apart)
+  arrange(date, .by_group = TRUE) %>%
+  mutate(ms_dx_date = first(na.omit(msdep_dx_hx_ms_diagnosis))) %>%
   slice_min(date, n = 1, with_ties = FALSE) %>%
   ungroup() %>%
   as.data.frame() #n=127
@@ -182,6 +188,10 @@ names(all_behavioral_data)[names(all_behavioral_data) == "MRN_clean"] <- "MRN"
 # took the CNB battery (e.g. bblid 11117), who the all=TRUE merges above kept around
 all_behavioral_data <- all_behavioral_data %>%
   filter(!is.na(test_sessions_v.dotest)) #n=121
+
+# years since MS diagnosis, counted from the date of the study (CNB session) -- NA if no redcap dx date
+all_behavioral_data <- all_behavioral_data %>%
+  mutate(years_since_ms_dx = as.numeric(test_sessions_v.dotest - ms_dx_date) / 365.25)
 ```
 
 ## Combine PRL data
@@ -239,7 +249,7 @@ combined_final$bad_warps <- ifelse(combined_final$EMPI %in% bad_warps, 1, 0)
 
 #De-identify and select CNB-paper columns
 Only the columns that
-cnb_lesion_structural_prl_final_analyses_pre_replication_20260818.Rmd actually reads:
+cnb_lesion_structural_prl_final_analyses_post_replication_20260917.Rmd actually reads:
 identifiers/covariates/QA flags, the raw CNB item columns needed for kosha z-scoring,
 lesion count/volume, GM/WM/CSF/total/ICV volumes, thalamic volume (raw + ICV-normalized),
 and PRL count/volume.
@@ -272,10 +282,10 @@ cnb_paper_columns <- c(
   "prl.count", "prl.volume..mm3."
 )
 
-combined_deidentified <- combined_final %>%
+cnb_paper_deidentified <- combined_final %>%
   select(all_of(cnb_paper_columns))
 
-write.csv(combined_deidentified, file = paste0(homedir, "data/cnb_prl_mimosa_struct_vol_deid.csv"))
+write.csv(cnb_paper_deidentified, file = paste0(homedir, "data/cnb_prl_mimosa_struct_vol_deid.csv"))
 ```
 
 #De-identify
@@ -298,9 +308,7 @@ write.csv(combined_deidentified, file = paste0(homedir, "data/cnb_goa_prl_mimosa
 ```{r}
 # Cleans select_demos_list from above to code for sex and on_dmt variables 
 demos_table_data <- combined_deidentified %>%
-  # changes 1 & 2 labels to male & female
   mutate(
-   
   # changes 0 & 1 binary labels to no & yes for DMT
     on_dmt = factor(on_dmt, levels = c(0,1), labels = c("No", "Yes"))
   )
@@ -373,6 +381,15 @@ educ_row <- data.frame(
   Total  = sprintf("%.2f [%.2f]", mean(demos_table_data$years_education, na.rm = TRUE), sd(demos_table_data$years_education, na.rm = TRUE))
 )
 
+# Years since MS diagnosis
+# mean years from MS diagnosis (redcap) to the study date for each group
+dx_row <- data.frame(
+  Characteristic = "Years Since MS Diagnosis (mean [SD])",
+  Female = sprintf("%.2f [%.2f]", mean(female_rows$years_since_ms_dx, na.rm = TRUE), sd(female_rows$years_since_ms_dx, na.rm = TRUE)),
+  Male   = sprintf("%.2f [%.2f]", mean(male_rows$years_since_ms_dx, na.rm = TRUE), sd(male_rows$years_since_ms_dx, na.rm = TRUE)),
+  Total  = sprintf("%.2f [%.2f]", mean(demos_table_data$years_since_ms_dx, na.rm = TRUE), sd(demos_table_data$years_since_ms_dx, na.rm = TRUE))
+)
+
 # On DMT?
 # Sum of people from each group on dmt
 dmt_female <- sum(female_rows$on_dmt == "Yes", na.rm = TRUE)
@@ -388,7 +405,7 @@ dmt_row <- data.frame(
 )
 # bind the table rows together and write/save the table
 demo_table <- rbind(
-  n_row, age_row, race_ethnicity_header, race_ethnicity_subtype, educ_row, dmt_row
+  n_row, age_row, race_ethnicity_header, race_ethnicity_subtype, educ_row, dx_row, dmt_row
 )
 demo_table
 write.csv(demo_table, paste0(resultsdir, "/demographics_table.csv"), row.names = FALSE)
@@ -432,6 +449,11 @@ build_demo_col <- function(df, col_name, race_levels, ethnicity_levels) {
     Value = sprintf("%.1f [%.1f]", mean(df$years_education, na.rm = TRUE), sd(df$years_education, na.rm = TRUE))
   )
 
+  dx_row <- data.frame(
+    Characteristic = "Years Since MS Diagnosis (mean [SD])",
+    Value = sprintf("%.1f [%.1f]", mean(df$years_since_ms_dx, na.rm = TRUE), sd(df$years_since_ms_dx, na.rm = TRUE))
+  )
+
   dmt_total <- sum(df$on_dmt == "Yes", na.rm = TRUE)
   dmt_row <- data.frame(
     Characteristic = "On DMT",
@@ -448,7 +470,7 @@ build_demo_col <- function(df, col_name, race_levels, ethnicity_levels) {
     Value = sprintf("%.1f [%.1f]", mean(df$promis_ms_fatigue_8a_calc, na.rm = TRUE), sd(df$promis_ms_fatigue_8a_calc, na.rm = TRUE))
   )
 
-  out <- rbind(n_row, female_row, age_row, race_ethnicity_header, race_ethnicity_subtype, educ_row, dmt_row, physfunc_row, fatigue_row)
+  out <- rbind(n_row, female_row, age_row, race_ethnicity_header, race_ethnicity_subtype, educ_row, dx_row, dmt_row, physfunc_row, fatigue_row)
   names(out)[names(out) == "Value"] <- col_name
   out
 }
@@ -485,9 +507,9 @@ write.csv(demo_table_by_sample, paste0(resultsdir, "/demographics_table_by_sampl
 
 ### Table1
 ```{r}
-# same columns as demo_table_by_sample (CNB, 3T, 7T), trimmed to n, % female, age, education, on DMT
+# same columns as demo_table_by_sample (CNB, 3T, 7T), trimmed to n, % female, age, education, years since MS dx, on DMT
 Table1 <- demo_table_by_sample %>%
-  filter(Characteristic %in% c("n", "Female", "Age (mean [SD])", "Education Level in Years (mean [SD])", "On DMT"))
+  filter(Characteristic %in% c("n", "Female", "Age (mean [SD])", "Education Level in Years (mean [SD])", "Years Since MS Diagnosis (mean [SD])", "On DMT"))
 
 Table1
 write.csv(Table1, paste0(resultsdir, "/Table1.csv"), row.names = FALSE)
