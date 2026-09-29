@@ -367,8 +367,10 @@ ggsave(paste0(homedir, "results/total_mean_plot.png"), plot = total_mean_plot, h
 
 ### Build and combine the 4 domain plots
 ```{r domain_acc_rt_plots}
-make_domain_acc_rt_plot <- function(domain_label) {
-  ggplot(domain_acc_rt_data %>% filter(Domain == domain_label),
+# plot_data/ylim default to the main-analysis objects; the full-CNB supplement below
+# passes its own subsample versions instead
+make_domain_acc_rt_plot <- function(domain_label, plot_data = domain_acc_rt_data, ylim = shared_acc_rt_ylim) {
+  ggplot(plot_data %>% filter(Domain == domain_label),
          aes(x = Metric, y = total_mean_z_score, fill = Metric)) +
     geom_bar(stat = "identity", width = 0.7) +
     geom_errorbar(aes(ymin = total_mean_z_score - ci95_half_width, ymax = total_mean_z_score + ci95_half_width),
@@ -388,7 +390,7 @@ make_domain_acc_rt_plot <- function(domain_label) {
       panel.background = element_rect(color = "white"),
       panel.grid = element_blank()
     ) +
-    scale_y_continuous(limits = shared_acc_rt_ylim) +
+    scale_y_continuous(limits = ylim) +
     scale_fill_manual(values = c("Accuracy" = "#5A80C7", "Response Time" = "goldenrod1"))
 }
 
@@ -655,6 +657,8 @@ write.csv(cog_summary_table_simple_export,
 
 ```
 
+
+
 # ============================================================
 # Supplementary Analyses
 # ============================================================
@@ -739,4 +743,260 @@ ggsave(paste0(homedir, "results/supp_fig_rt_domain_anova.png"), plot = supp_rt_d
 
 write.csv(supp_rt_anova$anova, paste0(homedir, "results/supp_rt_domain_anova.csv"), row.names = FALSE)
 if (!is.null(supp_rt_anova$posthoc)) write.csv(supp_rt_anova$posthoc, paste0(homedir, "results/supp_rt_domain_tukey.csv"), row.names = FALSE)
+```
+
+
+# ============================================================
+# Supplementary Analyses: Full-CNB Subsample
+# ============================================================
+
+Everything above, re-run on only the participants with a *complete* CNB -- i.e. no
+missing z-score in any of the task columns that go into the 8 domain scores (the
+`ef/cc/mem/emo_acc_task_columns` + `ef/cc/mem/emo_rt_task_columns` defined at the top,
+11 tasks x acc/RT = 22 columns). In the main analyses the domain scores are
+`rowMeans(..., na.rm = TRUE)`, so someone missing one task still gets a domain score
+from the remaining tasks; here they're dropped instead. Note sctap (acc) and mpract (RT)
+only feed the overall `mean_acc_z`/`mean_rt_z`, not any domain, so they are not part of
+this definition. All output files get a `_fullcnb` suffix so nothing above is overwritten.
+
+## Define full-CNB subsample
+```{r fullcnb_subsample}
+# every task z-score column that feeds one of the 8 domain scores
+fullcnb_domain_task_columns <- unique(c(ef_acc_task_columns, cc_acc_task_columns,
+                                        mem_acc_task_columns, emo_acc_task_columns,
+                                        ef_rt_task_columns, cc_rt_task_columns,
+                                        mem_rt_task_columns, emo_rt_task_columns))
+
+# is.finite drops NA and NaN (and Inf, if a norm ever produced one)
+cog_domains_imaging_fullcnb <- cog_domains_imaging %>%
+  filter(if_all(all_of(fullcnb_domain_task_columns), is.finite))
+
+cat("Participants in cog_domains_imaging (incl. no CNB):", nrow(cog_domains_imaging), "\n")
+cat("Participants with >= 1 domain task score:",
+    sum(rowSums(sapply(cog_domains_imaging[fullcnb_domain_task_columns], is.finite)) > 0), "\n")
+cat("Participants with FULL CNB (all", length(fullcnb_domain_task_columns), "domain task columns present):",
+    nrow(cog_domains_imaging_fullcnb), "\n")
+cat("PRL participants with FULL CNB:", sum(!is.na(cog_domains_imaging_fullcnb$prl.count)), "\n\n")
+
+# number missing per task column (among everyone), to see which tasks drive the exclusions
+cat("Missing per domain task column:\n")
+colSums(!sapply(cog_domains_imaging[fullcnb_domain_task_columns], is.finite))
+```
+
+## Overall and domain accuracy/RT one-sample t-tests (full CNB)
+Same as the `overall_acc_rt_data` / `domain_acc_rt_data` chunks above (8 domain tests
+FDR-corrected as one family; overall acc/RT descriptive only), on the full-CNB subsample.
+```{r fullcnb_domain_acc_rt_data}
+overall_acc_rt_data_fullcnb <- bind_rows(
+  run_one_sample_t(cog_domains_imaging_fullcnb$mean_acc_z, label = "mean_acc_z") %>% mutate(Metric = "Accuracy"),
+  run_one_sample_t(cog_domains_imaging_fullcnb$mean_rt_z,  label = "mean_rt_z")  %>% mutate(Metric = "Response Time")
+) %>%
+  mutate(
+    total_mean_z_score = mean_z,
+    total_se = sd_z / sqrt(n),
+    ci95_half_width = qt(0.975, df) * total_se
+  )
+
+overall_acc_rt_data_fullcnb
+
+domain_acc_rt_data_fullcnb <- map_dfr(names(domain_metric_outcomes), function(domain) {
+  map_dfr(names(domain_metric_outcomes[[domain]]), function(metric) {
+    outcome_col <- domain_metric_outcomes[[domain]][[metric]]
+    run_one_sample_t(cog_domains_imaging_fullcnb[[outcome_col]], label = outcome_col) %>%
+      mutate(Domain = domain, Metric = metric)
+  })
+}) %>%
+  mutate(
+    p_fdr   = p.adjust(p, method = "fdr"),
+    fdr_sig = ifelse(p_fdr < 0.05, "*", ""),
+    total_mean_z_score = mean_z,
+    total_se = sd_z / sqrt(n),
+    ci95_half_width = qt(0.975, df) * total_se,
+    star_y = ifelse(total_mean_z_score >= 0,
+                     total_mean_z_score + ci95_half_width + 0.18,
+                     total_mean_z_score - ci95_half_width - 0.18)
+  )
+
+domain_acc_rt_data_fullcnb
+
+# shared y-axis range across all 5 full-CNB panels (same recipe as shared_acc_rt_ylim)
+shared_acc_rt_ylim_fullcnb <- c(
+  min(c(overall_acc_rt_data_fullcnb$total_mean_z_score - overall_acc_rt_data_fullcnb$ci95_half_width,
+        domain_acc_rt_data_fullcnb$total_mean_z_score  - domain_acc_rt_data_fullcnb$ci95_half_width,
+        domain_acc_rt_data_fullcnb$star_y)) - y_pad,
+  max(c(overall_acc_rt_data_fullcnb$total_mean_z_score + overall_acc_rt_data_fullcnb$ci95_half_width,
+        domain_acc_rt_data_fullcnb$total_mean_z_score  + domain_acc_rt_data_fullcnb$ci95_half_width,
+        domain_acc_rt_data_fullcnb$star_y)) + y_pad
+)
+```
+
+## Overall and domain accuracy/RT plots (full CNB)
+```{r fullcnb_domain_acc_rt_plots}
+# ---- overall (same styling as total_mean_plot) ----
+total_mean_plot_fullcnb <- ggplot(overall_acc_rt_data_fullcnb, aes(x = Metric, y = total_mean_z_score, fill = Metric)) +
+  geom_bar(stat = "identity", width = 0.7) +
+  geom_errorbar(aes(ymin = total_mean_z_score - ci95_half_width, ymax = total_mean_z_score + ci95_half_width),
+                position = position_dodge(width = 0.6), width = 0.2, linewidth = 0.7) +
+  labs(y = "Mean z-score (+/- 95% C.I.)", x = "Metric") +
+  theme_classic() +
+  theme(
+    axis.text.x = element_text(angle = 0, hjust = 0.5, size = 14, color = "black"),
+    axis.text.y = element_text(size = 11, color = "black"),
+    axis.title.x = element_blank(),
+    axis.title.y = element_text(size = 14, margin = margin(r = 10)),
+    legend.position = "none",
+    axis.text = element_text(size = 14, color = "black"),
+    axis.line = element_line(size = 1),
+    panel.background = element_rect(color = "white"),
+    panel.grid = element_blank()
+  ) +
+  scale_y_continuous(limits = shared_acc_rt_ylim_fullcnb) +
+  scale_fill_manual(values = c("Accuracy" = "#5A80C7", "Response Time" = "goldenrod1"))
+
+total_mean_plot_fullcnb
+
+ggsave(paste0(homedir, "results/total_mean_plot_fullcnb.pdf"), plot = total_mean_plot_fullcnb, height = 6, width = 5)
+ggsave(paste0(homedir, "results/total_mean_plot_fullcnb.png"), plot = total_mean_plot_fullcnb, height = 6, width = 5)
+
+# ---- 4 domains (make_domain_acc_rt_plot from the main section, pointed at full-CNB data) ----
+domain_acc_rt_plots_fullcnb <- map(names(domain_metric_outcomes), make_domain_acc_rt_plot,
+                                   plot_data = domain_acc_rt_data_fullcnb,
+                                   ylim = shared_acc_rt_ylim_fullcnb)
+
+domain_acc_rt_combined_fullcnb <- wrap_plots(domain_acc_rt_plots_fullcnb, ncol = 2) +
+  plot_annotation(
+    tag_levels = "A",
+    subtitle = "* FDR-corrected (q < 0.05)",
+    theme = theme(plot.subtitle = element_text(hjust = 0, size = 12, face = "italic"),
+                  plot.tag = element_text(size = 16, face = "bold"))
+  )
+
+domain_acc_rt_combined_fullcnb
+
+ggsave(paste0(homedir, "results/domain_acc_rt_combined_plot_fullcnb.pdf"), plot = domain_acc_rt_combined_fullcnb, height = 8, width = 8)
+ggsave(paste0(homedir, "results/domain_acc_rt_combined_plot_fullcnb.png"), plot = domain_acc_rt_combined_fullcnb, height = 8, width = 8)
+```
+
+## Cognitive domains vs imaging and PRL (full CNB)
+Same models as `cog_imaging_results` / `prl_domain_results` / the overall rows above
+(age + sex, + ICV for `icv_covariate_predictors`; FDR within each predictor across the 8
+domains). run_item_imaging_lm() fits the same lm as the hand-rolled cog_by_lesion_burden
+chunk, so the domain results are directly comparable.
+```{r fullcnb_imaging_lms}
+cog_imaging_results_fullcnb <- run_item_imaging_lm(cog_outcomes, imaging_predictors, cog_domains_imaging_fullcnb,
+                                                   icv_covariate_predictors = icv_covariate_predictors)
+cog_imaging_results_fullcnb
+
+# PRL subsample within full CNB (cog_domains_imaging_fullcnb already carries the domain
+# and overall z-scores, so no need to rebuild them like prl_with_cnb does above)
+prl_with_cnb_fullcnb <- cog_domains_imaging_fullcnb %>% filter(!is.na(prl.count))
+cat("N in full-CNB PRL subsample:", nrow(prl_with_cnb_fullcnb), "\n")
+
+prl_domain_results_fullcnb <- run_item_imaging_lm(cog_outcomes, c("prl.count", "prl.volume..mm3."), prl_with_cnb_fullcnb,
+                                                  icv_covariate_predictors = icv_covariate_predictors)
+prl_domain_results_fullcnb
+
+# overall cognition rows -- own FDR family of 2, no stars (same as main table)
+overall_imaging_results_fullcnb <- run_item_imaging_lm(c("mean_acc_z", "mean_rt_z"), imaging_predictors, cog_domains_imaging_fullcnb,
+                                                       icv_covariate_predictors = icv_covariate_predictors)
+overall_prl_results_fullcnb     <- run_item_imaging_lm(c("mean_acc_z", "mean_rt_z"), c("prl.count", "prl.volume..mm3."), prl_with_cnb_fullcnb,
+                                                       icv_covariate_predictors = icv_covariate_predictors)
+```
+
+## Cognitive Domain Summary Table (simplified, full CNB)
+Same 7 columns as Table 2 (`cog_domain_summary_table_simple`), full-CNB subsample.
+```{r fullcnb_cog_domain_summary_table_simple}
+# column label -> predictor, and which results it comes from (imaging vs PRL), in Table 2 order
+fullcnb_table_cols <- tribble(
+  ~label,             ~predictor,                   ~source,
+  "GM Volume",        "gm_volume",                  "imaging",
+  "WM Volume",        "wm_volume",                  "imaging",
+  "Thalamic Volume",  "Thalamus_total_openmap_seg", "imaging",
+  "WM Lesion Count",  "lesion_count",               "imaging",
+  "WM Lesion Volume", "volume_of_mimosa_lesions",   "imaging",
+  "PRL Count",        "prl.count",                  "prl",
+  "PRL Volume",       "prl.volume..mm3.",           "prl"
+)
+fullcnb_domain_results  <- list(imaging = cog_imaging_results_fullcnb,     prl = prl_domain_results_fullcnb)
+fullcnb_overall_results <- list(imaging = overall_imaging_results_fullcnb, prl = overall_prl_results_fullcnb)
+
+# rows: 8 domains (starred, make_col) then Mean Accuracy / Mean RT (no stars, make_col_nostar)
+cog_summary_table_simple_fullcnb <- bind_rows(
+  tibble(outcome = names(domain_labels),  Domain = unname(domain_labels)),
+  tibble(outcome = names(overall_labels), Domain = unname(overall_labels))
+)
+for (i in seq_len(nrow(fullcnb_table_cols))) {
+  pred <- fullcnb_table_cols$predictor[i]
+  src  <- fullcnb_table_cols$source[i]
+  cells <- bind_rows(make_col(fullcnb_domain_results[[src]], pred),
+                     make_col_nostar(fullcnb_overall_results[[src]], pred))
+  cog_summary_table_simple_fullcnb <- cog_summary_table_simple_fullcnb %>%
+    left_join(cells, by = "outcome") %>%
+    dplyr::rename(!!fullcnb_table_cols$label[i] := cell)
+}
+cog_summary_table_simple_fullcnb <- cog_summary_table_simple_fullcnb %>% select(-outcome)
+
+col_names_simple_fullcnb <- c(
+  "Domain",
+  paste0(fullcnb_table_cols$label, " (n=",
+         map2_dbl(fullcnb_table_cols$predictor, fullcnb_table_cols$source,
+                  ~ get_n(fullcnb_domain_results[[.y]], .x)),
+         ")")
+)
+
+cog_table_for_viewing_simple_fullcnb <- kable(cog_summary_table_simple_fullcnb,
+      col.names = col_names_simple_fullcnb,
+      caption = "FULL-CNB SUBSAMPLE (no missing domain task scores). Cognitive domains (FDR-corrected within each imaging measure, * = FDR p < 0.05) plus overall cognition (Mean Accuracy / Mean RT, not part of the domain FDR family, no significance marking) by imaging measures: T(p), d=Cohen's d",
+      align = c("l", rep("c", 7))) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+cog_table_for_viewing_simple_fullcnb
+
+kableExtra::save_kable(
+  cog_table_for_viewing_simple_fullcnb,
+  file = paste0(homedir, "results/cog_domain_summary_table_simple_fullcnb.png")
+)
+
+cog_summary_table_simple_fullcnb_export <- cog_summary_table_simple_fullcnb
+names(cog_summary_table_simple_fullcnb_export) <- col_names_simple_fullcnb
+write.csv(cog_summary_table_simple_fullcnb_export,
+          file = paste0(homedir, "results/SuppTable_cog_domain_summary_table_simple_fullcnb.csv"),
+          row.names = FALSE)
+```
+
+## Cognitive domain accuracy and RT anovas (full CNB)
+Same RM ANOVA + Tukey post hoc as `supp_acc_domain_anova` / `supp_rt_domain_anova`.
+```{r fullcnb_domain_anovas}
+# ---- Accuracy ----
+supp_acc_long_fullcnb  <- make_supp_domain_long(supp_domain_cols$Accuracy, cog_domains_imaging_fullcnb)
+supp_acc_anova_fullcnb <- run_supp_domain_anova(supp_acc_long_fullcnb)
+
+cat("FULL CNB -- Accuracy domains, repeated-measures ANOVA (n =", supp_acc_anova_fullcnb$n, ")\n")
+supp_acc_anova_fullcnb$mauchly
+supp_acc_anova_fullcnb$anova
+if (!is.null(supp_acc_anova_fullcnb$posthoc)) supp_acc_anova_fullcnb$posthoc else cat("Omnibus ANOVA not significant -- no post hoc tests run.\n")
+
+supp_acc_domain_plot_fullcnb <- make_supp_domain_plot(supp_acc_long_fullcnb, supp_acc_anova_fullcnb, fill_color = "#5A80C7")
+supp_acc_domain_plot_fullcnb
+
+ggsave(paste0(homedir, "results/supp_fig_acc_domain_anova_fullcnb.pdf"), plot = supp_acc_domain_plot_fullcnb, height = 6, width = 9)
+ggsave(paste0(homedir, "results/supp_fig_acc_domain_anova_fullcnb.png"), plot = supp_acc_domain_plot_fullcnb, height = 6, width = 9)
+write.csv(supp_acc_anova_fullcnb$anova, paste0(homedir, "results/supp_acc_domain_anova_fullcnb.csv"), row.names = FALSE)
+if (!is.null(supp_acc_anova_fullcnb$posthoc)) write.csv(supp_acc_anova_fullcnb$posthoc, paste0(homedir, "results/supp_acc_domain_tukey_fullcnb.csv"), row.names = FALSE)
+
+# ---- RT (negative = slower) ----
+supp_rt_long_fullcnb  <- make_supp_domain_long(supp_domain_cols$`Response Time`, cog_domains_imaging_fullcnb)
+supp_rt_anova_fullcnb <- run_supp_domain_anova(supp_rt_long_fullcnb)
+
+cat("FULL CNB -- RT domains, repeated-measures ANOVA (n =", supp_rt_anova_fullcnb$n, ")\n")
+supp_rt_anova_fullcnb$mauchly
+supp_rt_anova_fullcnb$anova
+if (!is.null(supp_rt_anova_fullcnb$posthoc)) supp_rt_anova_fullcnb$posthoc else cat("Omnibus ANOVA not significant -- no post hoc tests run.\n")
+
+supp_rt_domain_plot_fullcnb <- make_supp_domain_plot(supp_rt_long_fullcnb, supp_rt_anova_fullcnb, fill_color = "goldenrod1")
+supp_rt_domain_plot_fullcnb
+
+ggsave(paste0(homedir, "results/supp_fig_rt_domain_anova_fullcnb.pdf"), plot = supp_rt_domain_plot_fullcnb, height = 6, width = 9)
+ggsave(paste0(homedir, "results/supp_fig_rt_domain_anova_fullcnb.png"), plot = supp_rt_domain_plot_fullcnb, height = 6, width = 9)
+write.csv(supp_rt_anova_fullcnb$anova, paste0(homedir, "results/supp_rt_domain_anova_fullcnb.csv"), row.names = FALSE)
+if (!is.null(supp_rt_anova_fullcnb$posthoc)) write.csv(supp_rt_anova_fullcnb$posthoc, paste0(homedir, "results/supp_rt_domain_tukey_fullcnb.csv"), row.names = FALSE)
 ```
