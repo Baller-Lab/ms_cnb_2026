@@ -67,7 +67,7 @@ names(cnb_data) <- gsub(x=names(cnb_data), pattern = "\\PCET_A\\.", replacement 
 ## read in redcap data
 
 #there are a couple of people who have missing data - 24092 (skipped some BDI questions); 24253 - missed bdi, 24624 - missed bdi question
-redcap_data <- read.csv(paste0(homedir, "data/redcap_data_20260202.csv"), sep = ",", header = TRUE)
+redcap_data <- read.csv(paste0(homedir, "data/MSDepressionCollecti_DATA_2026-09-29_1545.csv"), sep = ",", header = TRUE)
 
 #filter ones where scales were not complete
 redcap_data <- redcap_data %>%
