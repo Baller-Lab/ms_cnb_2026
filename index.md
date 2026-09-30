@@ -7,10 +7,10 @@
 Erica B. Baller
 
 ### Brief Project Description:
-121 participants with MS were included (76%F, mean age 43.0). Cognitive assessments with CNB were performed and summarized by overall accuracy and speed, and by cognitive domain. Patterns of cognitive disease were then evaluated in relation to lesion burden (count and volume, n=101), GM, WM, and thalamic volume (n=102) from research-grade clinical scans, and PRL burden (count and volume, n=27) from 7T. 
+116 participants with MS were included (75%F, mean age 42.8). Cognitive assessments with CNB were performed and summarized by overall accuracy and speed, and by cognitive domain. Patterns of cognitive disease were then evaluated in relation to lesion burden (count and volume, n=99), GM, WM, and thalamic volume (n=100) from research-grade clinical scans, and PRL burden (count and volume, n=27) from 7T. 
 
 ### Authors/Collaborators:
-Erica B. Baller, M.D., M.S., Elizabeth A. Horwath, Ph.D., Millie R. Sach, B.A., Elena C. Cooper, B.A., Nikka Bakhtiar, M.S., Amit Bar-Or, M.D., Rachel B. Brandstadter, M.D., Ruben C. Gur, Ph.D., Dina A. Jacobs, M.D., Christopher M. Perrone, M.D., David R. Roalf, Ph.D., Kosha Ruparel, M.S.E., J. Cobb Scott, Ph.D., Theodore D. Satterthwaite, M.D., M.A., Russell T. Shinohara, Ph.D., Matthew K. Schindler, M.D., Ph.D. 
+Erica B. Baller, M.D., M.S., Elizabeth A. Horwath, Ph.D., Millie R. Sach, B.A., Elena C. Cooper, B.A., Nikka Bakhtiar, M.S., Amit Bar-Or, M.D., Rachel B. Brandstadter, M.D., Ruben C. Gur, Ph.D., Dina A. Jacobs, M.D., Steven Meisler, Ph.D., Christopher M. Perrone, M.D., David R. Roalf, Ph.D., Kosha Ruparel, M.S.E., J. Cobb Scott, Ph.D., Theodore D. Satterthwaite, M.D., M.A., Russell T. Shinohara, Ph.D., Matthew K. Schindler, M.D., Ph.D. 
 
 
 ### Project Start Date:
@@ -143,11 +143,11 @@ This script is run locally, on R. It does all second level/group data analysis. 
 [cnb_lesion_structural_prl_final_analyses_post_replication_20260917.Rmd](https://github.com/Baller-Lab/ms_cnb_2026/tree/main/scripts/cnb_lesion_structural_prl_final_analyses_post_replication_20260917.Rmd)
 
 #### Overall Cognitive Results
-![overall_mean_accuracy_and_rt](results/total_mean_plot.png)
+![overall_mean_accuracy_and_rt](results/Figure2.png)
 
 #### Cognitive Results by Domain
-![mean_acc_and_rt_by_domain](results/domain_acc_rt_combined_plot.png)
+![mean_acc_and_rt_by_domain](results/Figure3.png)
 
 #### Cognitive Results by Domain vs GM, WM, Thalamus, WML, and PRL Metrics
-![cognition_by_imaging_metric](results/cog_domain_summary_table_simple.png)
+![cognition_by_imaging_metric](results/Table2.png)
 
