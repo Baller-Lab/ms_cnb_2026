@@ -245,6 +245,35 @@ combined_final$bad_warps <- ifelse(combined_final$EMPI %in% bad_warps, 1, 0)
 
 ```
 
+#Full CNB flag
+ - full_cnb = 1 if the participant has every raw CNB column that feeds the 8 domain scores
+   (11 tasks x acc/RT = 22 columns), 0 otherwise. Same people as the "Full-CNB Subsample"
+   section of cnb_lesion_structural_prl_final_analyses_post_replication_20260917.Rmd (n=116).
+ - SCTAP (finger taps acc) and MPRACT (sensorimotor RT) only feed the overall mean acc/RT,
+   not a domain, so they are not part of this definition.
+ - The 5 people with full_cnb = 0 (checked 9/30/2026): 60637 (no PCPTNL/CPF/CPW), 24772 (no LNB2),
+   24587/60589/24261 (0% correct on VSPLOT15 -- and SPVRT for 24261 -- so no RT on correct trials)
+```{r full_cnb}
+full_cnb_columns <- c(
+  "ER40_A.ER40_CR", "ER40_A.ER40_RTCR",
+  "CPF_A.CPF_CR", "CPF_A.CPF_RTCR",
+  "LNB2_135.LNB2_PC", "LNB2_135.LNB2_MRTC",
+  "SPVRT_A.SPVRTA_PC", "SPVRT_A.SPVRTA_RTCR",
+  "PCET.PCET_ACC2", "PCET.PCET_RTCR",
+  "PCPTNL.CPT_TPR", "PCPTNL.CPT_TPRT",
+  "PMAT24_A.PMAT24_A_PC", "PMAT24_A.PMAT24_A_RTCR",
+  "CPW_A.CPW_CR", "CPW_A.CPW_RTCR",
+  "SVOLT_A.SVOLT_CR", "SVOLT_A.SVOLT_RTCR",
+  "VSPLOT15.VSPLOT15_PC", "VSPLOT15.VSPLOT15_RTCR",
+  "MEDF36_A.MEDF36A_PC", "MEDF36_A.MEDF36A_RTCR"
+)
+
+combined_final$full_cnb <- ifelse(rowSums(is.na(combined_final[full_cnb_columns])) == 0, 1, 0)
+
+cat("full_cnb == 1:", sum(combined_final$full_cnb == 1), "of", nrow(combined_final), "\n") #116 of 121
+cat("full_cnb == 0 (bblid):", combined_final$bblid[combined_final$full_cnb == 0], "\n")
+```
+
 
 
 #De-identify and select CNB-paper columns
@@ -257,7 +286,7 @@ and PRL count/volume.
 cnb_paper_columns <- c(
   # identifiers / covariates / QA
   "bblid", "test_sessions_v.age", "test_sessions_v.gender",
-  "bad_scans_native_space", "bad_warps",
+  "bad_scans_native_space", "bad_warps", "full_cnb",
   # raw CNB task columns (kosha norm z-scoring, see ms_tasks_kosha in the analysis script)
   "ER40_A.ER40_CR", "ER40_A.ER40_RTCR",
   "CPF_A.CPF_CR", "CPF_A.CPF_RTCR",
@@ -306,8 +335,12 @@ write.csv(combined_deidentified, file = paste0(homedir, "data/cnb_goa_prl_mimosa
 
 #Demographics table
 ```{r}
-# Cleans select_demos_list from above to code for sex and on_dmt variables 
+# Cleans select_demos_list from above to code for sex and on_dmt variables
+# ALL demographics tables below (demo_table, Supplemental Table 1, Table1) are restricted to
+# people with a full CNB (full_cnb == 1, n=116) -- so the 3T and 7T columns are the full-CNB
+# people within those samples, not everyone with a scan
 demos_table_data <- combined_deidentified %>%
+  filter(full_cnb == 1) %>%
   mutate(
   # changes 0 & 1 binary labels to no & yes for DMT
     on_dmt = factor(on_dmt, levels = c(0,1), labels = c("No", "Yes"))
