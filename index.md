@@ -7,7 +7,7 @@
 Erica B. Baller
 
 ### Brief Project Description:
-142 participants with MS were included (78%F, mean age 43.2). Cognitive assessments with CNB were performed and summarized by overall accuracy and speed, and by cognitive domain. Patterns of cognitive disease were then evaluated in relation to lesion burden (count and volume, n=99), GM, WM, and thalamic volume (n=100) from research-grade clinical scans, and PRL burden (count and volume, n=27) from 7T. 
+153 participants with MS were included (77%F, mean age 43.3). Cognitive assessments with CNB were performed and summarized by overall accuracy and speed, and by cognitive domain. Patterns of cognitive disease were then evaluated in relation to lesion burden (count and volume, n=99), GM, WM, and thalamic volume (n=100) from research-grade clinical scans, and PRL burden (count and volume, n=27) from 7T. 
 
 ![Schematic](results/Figure1.png)
 
@@ -134,7 +134,7 @@ Assemble all thalamic segmentations into a csv:
 ### PRL preprocessing
 
 ### Combining groups
-Of the n=142 in our sample, n=100 had good T1 scans that were used for FAST segmentation and thalamic segmentation. n=99 had good T1s and FLAIRs (one person had missing FLAIR). n=27 had PRL data. In our combining script, all data were combined in a spreadsheet (with CNB, demos), and deidentified. This output csv was then taken to the full analysis script. 
+Of the n=153 in our sample, n=100 had good T1 scans that were used for FAST segmentation and thalamic segmentation. n=99 had good T1s and FLAIRs (one person had missing FLAIR). n=27 had PRL data. In our combining script, all data were combined in a spreadsheet (with CNB, demos), and deidentified. This output csv was then taken to the full analysis script. 
 
 [make_combined_spreadsheet_for_cnb_paper.Rmd](https://github.com/Baller-Lab/ms_cnb_2026/blob/main/scripts/make_combined_spreadsheet_for_cnb_paper_post_replication_full_cnb_csv.Rmd)
 
