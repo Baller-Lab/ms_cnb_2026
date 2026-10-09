@@ -2,7 +2,7 @@
 
 #### Welcome to the OpenMAP-T1 thalamic volume party #########
 ### Pre: Must have a sub_ses_list csv with one row per subject/session,
-###      "sub_id,ses_id", no header (e.g. REDACTED_ID,20230801). The
+###      "sub_id,ses_id", no header (e.g. 1234567890,20230101). The
 ###      corresponding data_dir/sub-<sub_id>/ses-<ses_id> must contain
 ###      anat/*T1*.nii.gz
 ### Post: Each subject/session gets an openmap-t1/ subdir with the

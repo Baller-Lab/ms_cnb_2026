@@ -90,7 +90,11 @@ if [ -z "${master_header}" ]; then
     echo "ERROR: no subject produced an all_volumes.csv -- nothing to assemble" >&2
     exit 1
 fi
-echo "${master_header}" > "${allvol_master}"
+#compare only the region columns (field 3 on) -- the first two are just the ID column names, which changed
+#from subject,session to EMPI,EXAM_DATE when indiv_openmap_t1_script.sh was fixed. Without this, every subject
+#rerun with the new script (10/9/2026: 24253, 24530) was written as an NA row. Master header always says EMPI,EXAM_DATE
+master_regions=$(echo "${master_header}" | cut -d, -f3-)
+echo "EMPI,EXAM_DATE,${master_regions}" > "${allvol_master}"
 
 #how many NA fields a stand-in row needs: total columns minus subject,session
 n_data_cols=$(( $(echo "${master_header}" | awk -F',' '{print NF}') - 2 ))
@@ -110,8 +114,8 @@ while IFS=',' read -r sub_id ses_id; do
         continue
     fi
 
-    this_header=$(head -n1 "${f}")
-    if [ "${this_header}" != "${master_header}" ]; then
+    this_regions=$(head -n1 "${f}" | cut -d, -f3-)
+    if [ "${this_regions}" != "${master_regions}" ]; then
         echo "WARNING: ${f} has a different header than the master (region set/order" >&2
         echo "         mismatch, likely a failed segmentation) -- writing NA row instead" >&2
         echo "         of misaligned data. Inspect this subject by hand." >&2
