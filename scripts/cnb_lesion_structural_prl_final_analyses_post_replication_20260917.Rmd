@@ -26,6 +26,17 @@ Uses: pared-down extract of cnb_goa_prl_mimosa_streamline_filtering_deid_2026062
 Dependencies: Using Rstudio version Version 2024.12.0+467 (2024.12.0+467); R v 4.4.2
               Supplementary Analyses section also needs rstatix, emmeans, ggsignif
               (called with pkg:: rather than library() so nothing gets masked)
+CHANGE LOG
+  10/9/2026 -- imaging reprocessing (see the merge script's change log + lab notebook 20261009):
+    - head-size covariate is now SAMSEG ICV (samseg_icv, a true ICV) for EVERY volume measure,
+      instead of FAST CSF+GM+WM (which only counts CSF inside the brain mask). Set in icv_column below
+    - Table 2 (final): thalamic volume (SAMSEG), WM lesion count/volume, PRL count/volume. GM/WM are NOT
+      reported (associations differ by segmentation tool); SAMSEG GM/WM + both thalamic measures moved to a
+      supplementary table (Table2_supp_samseg_gm_wm_thalamus). SAMSEG for both thalamus and ICV
+    - FAST rerun on the HD-BET skull strips (fast_hdbet), so the 2 FAST-workaround sensitivity
+      analyses at the end (drop 8 FAST outliers; OpenMAP + TBV) are turned off (eval = FALSE), and
+      replaced by a segmentation-method comparison section (FAST vs SAMSEG vs OpenMAP)
+    - 3T n is 101 (was 100): 24530's T1 was recovered
 -->
 
 ```{r setup, include=FALSE}
@@ -118,7 +129,12 @@ imaging_predictors <- c(
   "wm_by_icv",                  # white matter volume / intracranial volume
   "total_volume",                # total brain volume
   "Thalamus_total_openmap_seg", # thalamic volume (OpenMAP-T1)
-  "Thalamus_total_by_icv"       # thalamic volume / intracranial volume
+  "Thalamus_total_by_icv",      # thalamic volume / intracranial volume
+  # SAMSEG (added 10/9/2026) -- definitions in the merge script's SAMSEG chunk
+  "samseg_gm_total",            # total GM: cortex + deep GM + cerebellar GM
+  "samseg_cortical_gm",         # cerebral cortex only
+  "samseg_wm_total",            # cerebral + cerebellar WM + WM-hypointensities
+  "samseg_thalamus_total"       # thalamus (OpenMAP thalamus is still the main one)
 )
 ```
 
@@ -131,7 +147,13 @@ imaging_predictors <- c(
 # and the hand-rolled cog_imaging_results* blocks below -- everything else (lesion
 # count/volume, total_volume, the already-ICV-normalized gm_by_icv/wm_by_icv/
 # Thalamus_total_by_icv, PRL measures) never gets ICV.
-icv_covariate_predictors <- c("gm_volume", "wm_volume", "csf_volume", "Thalamus_total_openmap_seg")
+icv_covariate_predictors <- c("gm_volume", "wm_volume", "csf_volume", "Thalamus_total_openmap_seg",
+                              "samseg_gm_total", "samseg_cortical_gm", "samseg_wm_total", "samseg_thalamus_total")
+
+# which column is the ICV covariate (10/9/2026: SAMSEG's ICV, a true ICV -- brain plus ALL intracranial CSF.
+# Was intracranial_volume = FAST CSF+GM+WM, which only counts CSF inside the brain mask). Used by the
+# hand-rolled cog_imaging_results block and passed to every run_item_imaging_lm() call below
+icv_column <- "samseg_icv"
 
 ```
 
@@ -152,7 +174,8 @@ combined_final <- read.csv(paste0(homedir, "data/cnb_prl_mimosa_struct_vol_deid.
 # Lesion count, lesion volume, T1 volumetrics: bad_scans_native_space == 0
 native_space_cols <- c("volume_of_mimosa_lesions", "lesion_count",
                        "csf_volume", "gm_volume", "wm_volume", "gm_by_icv", "wm_by_icv", "total_volume",
-                       "Thalamus_total_openmap_seg", "Thalamus_total_by_icv")
+                       "Thalamus_total_openmap_seg", "Thalamus_total_by_icv",
+                       "samseg_icv", "samseg_gm_total", "samseg_cortical_gm", "samseg_wm_total", "samseg_thalamus_total")
 combined_final <- combined_final %>%
   filter(full_cnb == 1) %>%
   mutate(across(all_of(native_space_cols),
@@ -434,7 +457,7 @@ cog_imaging_results <- map(imaging_predictors, function(img_var) {
   covariates_dep <- c("test_sessions_v.age", "test_sessions_v.gender")
   
   #add icv as a covariate for our prespecified analyses)
-  if (img_var %in% icv_covariate_predictors) covariates_dep <- c(covariates_dep, "intracranial_volume")
+  if (img_var %in% icv_covariate_predictors) covariates_dep <- c(covariates_dep, icv_column) #samseg_icv since 10/9/2026
 
   tibble(outcome = cog_outcomes) %>%
     mutate(
@@ -492,7 +515,7 @@ cat("N in PRL subsample:", nrow(prl_with_cnb), "\n")
 cog_domain_outcomes <- c("ef_acc", "cc_acc", "mem_acc", "emo_acc",
                          "ef_rt",  "cc_rt",  "mem_rt",  "emo_rt")
 
-prl_domain_results <- run_item_imaging_lm(cog_domain_outcomes, c("prl.count", "prl.volume..mm3."), prl_with_cnb, icv_covariate_predictors = icv_covariate_predictors)
+prl_domain_results <- run_item_imaging_lm(cog_domain_outcomes, c("prl.count", "prl.volume..mm3."), prl_with_cnb, icv_covariate_predictors = icv_covariate_predictors, icv_column = icv_column)
 prl_domain_results
 ```
 
@@ -518,6 +541,12 @@ prl_volume_col     <- make_col(prl_domain_results,  "prl.volume..mm3.")
 thalamus_col            <- make_col(cog_imaging_results, "Thalamus_total_openmap_seg")
 thalamus_by_icv_col     <- make_col(cog_imaging_results, "Thalamus_total_by_icv")
 
+# SAMSEG (added 10/9/2026), all adjusted for samseg_icv
+samseg_gm_col       <- make_col(cog_imaging_results, "samseg_gm_total")
+samseg_ctx_col      <- make_col(cog_imaging_results, "samseg_cortical_gm")
+samseg_wm_col       <- make_col(cog_imaging_results, "samseg_wm_total")
+samseg_thal_col     <- make_col(cog_imaging_results, "samseg_thalamus_total")
+
 domain_rows <- tibble(outcome = names(domain_labels)) %>%
   mutate(Domain = domain_labels[outcome]) %>%
   left_join(lesion_count_col,  by = "outcome") %>% dplyr::rename(`Lesion Count`    = cell) %>%
@@ -530,11 +559,17 @@ domain_rows <- tibble(outcome = names(domain_labels)) %>%
   left_join(total_volume_col,  by = "outcome") %>% dplyr::rename(`Total Volume`    = cell) %>%
   left_join(thalamus_col,      by = "outcome") %>% dplyr::rename(`Thalamic Volume` = cell) %>%
   left_join(thalamus_by_icv_col, by = "outcome") %>% dplyr::rename(`Thalamic/ICV`  = cell) %>%
+  left_join(samseg_gm_col,     by = "outcome") %>% dplyr::rename(`SAMSEG Total GM`    = cell) %>%
+  left_join(samseg_ctx_col,    by = "outcome") %>% dplyr::rename(`SAMSEG Cortical GM` = cell) %>%
+  left_join(samseg_wm_col,     by = "outcome") %>% dplyr::rename(`SAMSEG WM`          = cell) %>%
+  left_join(samseg_thal_col,   by = "outcome") %>% dplyr::rename(`SAMSEG Thalamus`    = cell) %>%
   left_join(prl_count_col,     by = "outcome") %>% dplyr::rename(`PRL Count`       = cell) %>%
   left_join(prl_volume_col,    by = "outcome") %>% dplyr::rename(`PRL Volume`      = cell) %>%
   select(Domain, `Lesion Count`, `Lesion Volume`,
          `CSF Volume`, `GM Volume`, `WM Volume`, `GM/ICV`, `WM/ICV`, `Total Volume`,
-         `Thalamic Volume`, `Thalamic/ICV`, `PRL Count`, `PRL Volume`)
+         `Thalamic Volume`, `Thalamic/ICV`,
+         `SAMSEG Total GM`, `SAMSEG Cortical GM`, `SAMSEG WM`, `SAMSEG Thalamus`,
+         `PRL Count`, `PRL Volume`)
 
 # ---- Overall cognition rows (Mean Accuracy, Mean RT) ----
 # Same predictors, but each predictor's FDR family here only ever contains
@@ -554,8 +589,8 @@ overall_prl_data <- combined_final %>%
     mean_rt_z  = rowMeans(across(all_of(rt_task_columns)),  na.rm = TRUE)
   )
 
-overall_imaging_results  <- run_item_imaging_lm(c("mean_acc_z", "mean_rt_z"), imaging_predictors, cog_domains_imaging, icv_covariate_predictors = icv_covariate_predictors)
-overall_prl_results      <- run_item_imaging_lm(c("mean_acc_z", "mean_rt_z"), c("prl.count", "prl.volume..mm3."), overall_prl_data, icv_covariate_predictors = icv_covariate_predictors)
+overall_imaging_results  <- run_item_imaging_lm(c("mean_acc_z", "mean_rt_z"), imaging_predictors, cog_domains_imaging, icv_covariate_predictors = icv_covariate_predictors, icv_column = icv_column)
+overall_prl_results      <- run_item_imaging_lm(c("mean_acc_z", "mean_rt_z"), c("prl.count", "prl.volume..mm3."), overall_prl_data, icv_covariate_predictors = icv_covariate_predictors, icv_column = icv_column)
 
 overall_labels <- c(mean_acc_z = "Mean Accuracy", mean_rt_z = "Mean RT")
 
@@ -571,28 +606,38 @@ overall_rows <- tibble(outcome = names(overall_labels)) %>%
   left_join(make_col_nostar(overall_imaging_results,  "total_volume"),               by = "outcome") %>% dplyr::rename(`Total Volume`    = cell) %>%
   left_join(make_col_nostar(overall_imaging_results,  "Thalamus_total_openmap_seg"), by = "outcome") %>% dplyr::rename(`Thalamic Volume` = cell) %>%
   left_join(make_col_nostar(overall_imaging_results,  "Thalamus_total_by_icv"),      by = "outcome") %>% dplyr::rename(`Thalamic/ICV`    = cell) %>%
+  left_join(make_col_nostar(overall_imaging_results,  "samseg_gm_total"),            by = "outcome") %>% dplyr::rename(`SAMSEG Total GM`    = cell) %>%
+  left_join(make_col_nostar(overall_imaging_results,  "samseg_cortical_gm"),         by = "outcome") %>% dplyr::rename(`SAMSEG Cortical GM` = cell) %>%
+  left_join(make_col_nostar(overall_imaging_results,  "samseg_wm_total"),            by = "outcome") %>% dplyr::rename(`SAMSEG WM`          = cell) %>%
+  left_join(make_col_nostar(overall_imaging_results,  "samseg_thalamus_total"),      by = "outcome") %>% dplyr::rename(`SAMSEG Thalamus`    = cell) %>%
   left_join(make_col_nostar(overall_prl_results,      "prl.count"),                  by = "outcome") %>% dplyr::rename(`PRL Count`       = cell) %>%
   left_join(make_col_nostar(overall_prl_results,      "prl.volume..mm3."),           by = "outcome") %>% dplyr::rename(`PRL Volume`      = cell) %>%
   select(Domain, `Lesion Count`, `Lesion Volume`,
          `CSF Volume`, `GM Volume`, `WM Volume`, `GM/ICV`, `WM/ICV`, `Total Volume`,
-         `Thalamic Volume`, `Thalamic/ICV`, `PRL Count`, `PRL Volume`)
+         `Thalamic Volume`, `Thalamic/ICV`,
+         `SAMSEG Total GM`, `SAMSEG Cortical GM`, `SAMSEG WM`, `SAMSEG Thalamus`,
+         `PRL Count`, `PRL Volume`)
 
-cog_summary_table <- bind_rows(domain_rows, overall_rows)
+#overall Mean Accuracy / Mean RT rows first, then the 8 domain rows
+cog_summary_table <- bind_rows(overall_rows, domain_rows)
 
 ```
 
 ## Cognitive Domain Summary Table (simplified)
 
-Narrower view of the cognitive domain summary table above: lesion count/volume,
-GM/WM volume, thalamic volume, and PRL count/volume only -- no CSF, Total Volume, or the
-ICV-corrected (GM/ICV, WM/ICV, Thalamic/ICV) columns.
+Table 2 for the paper: thalamic volume (SAMSEG), WM lesion count/volume, and PRL count/volume.
+
+Decision 10/9/2026 (lab notebook 20261009): thalamic volume vs cognition is consistent across segmentation
+tools (SAMSEG and OpenMAP give the same FDR-surviving domains), but GM and WM are not -- which tool you use
+changes whether GM or WM tracks cognition, most likely because the tools draw the GM/WM boundary differently
+(e.g. how T1-dark lesions are classified). GM/WM are also fairly nonspecific, so they are not reported in the
+paper; the SAMSEG GM/WM table is kept as a supplement (next chunk) along with the method comparison at the end.
+SAMSEG is used for both thalamus and ICV (results match OpenMAP, no advantage to mixing two tools).
 
 ```{r cog_domain_summary_table_simple}
 col_names_simple <- c(
   "Domain",
-  paste0("GM Volume (n=",       get_n(cog_imaging_results,     "gm_volume"), ")"),
-  paste0("WM Volume (n=",       get_n(cog_imaging_results,     "wm_volume"), ")"),
-  paste0("Thalamic Volume (n=", get_n(cog_imaging_results, "Thalamus_total_openmap_seg"), ")"),
+  paste0("Thalamic Volume (n=",    get_n(cog_imaging_results, "samseg_thalamus_total"), ")"),
   paste0("WM Lesion Count (n=",    get_n(cog_imaging_results,     "lesion_count"), ")"),
   paste0("WM Lesion Volume (n=",   get_n(cog_imaging_results,     "volume_of_mimosa_lesions"), ")"),
   paste0("PRL Count (n=",       get_n(prl_domain_results,      "prl.count"), ")"),
@@ -600,13 +645,12 @@ col_names_simple <- c(
 )
 
 cog_summary_table_simple <- cog_summary_table %>%
-  select(Domain, `GM Volume`, `WM Volume`, `Thalamic Volume`,
-         `Lesion Count`, `Lesion Volume`, `PRL Count`, `PRL Volume`)
+  select(Domain, `SAMSEG Thalamus`, `Lesion Count`, `Lesion Volume`, `PRL Count`, `PRL Volume`)
 
 cog_table_for_viewing_simple <- kable(cog_summary_table_simple,
       col.names = col_names_simple,
-      caption = "Cognitive domains (FDR-corrected within each imaging measure, * = FDR p < 0.05) plus overall cognition (Mean Accuracy / Mean RT, not part of the domain FDR family, no significance marking) by imaging measures: T(p), d=Cohen's d",
-      align = c("l", rep("c", 7))) %>%
+      caption = "Overall cognition (Mean Accuracy / Mean RT, not part of the domain FDR family, no significance marking) plus cognitive domains (FDR-corrected within each imaging measure, * = FDR p &lt; 0.05) by imaging measures: T(p), d=Cohen's d. Thalamic volume from SAMSEG, adjusted for age, sex, and SAMSEG intracranial volume; lesion and PRL measures adjusted for age and sex",
+      align = c("l", rep("c", 5))) %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
 cog_table_for_viewing_simple
 
@@ -632,6 +676,39 @@ write.csv(cog_summary_table_simple_export,
           file = paste0(homedir, "results/Table2_cog_domain_summary_table_simple.csv"),
           row.names = FALSE)
 
+```
+
+## Supplementary Table: SAMSEG GM/WM and both thalamic measures
+
+Same models as Table 2 (age, sex, + SAMSEG ICV for volumes) with SAMSEG total GM, cortical GM, and total WM,
+and thalamic volume from both SAMSEG (Table 2) and OpenMAP-T1. Not in the main paper: GM/WM associations are not
+consistent across segmentation tools (see the method comparison section at the end).
+```{r supp_table_samseg_gm_wm}
+col_names_supp_gm_wm <- c(
+  "Domain",
+  paste0("Total GM Volume (n=",    get_n(cog_imaging_results, "samseg_gm_total"), ")"),
+  paste0("Cortical GM Volume (n=", get_n(cog_imaging_results, "samseg_cortical_gm"), ")"),
+  paste0("WM Volume (n=",          get_n(cog_imaging_results, "samseg_wm_total"), ")"),
+  paste0("Thalamic Volume, SAMSEG (n=",  get_n(cog_imaging_results, "samseg_thalamus_total"), ")"),
+  paste0("Thalamic Volume, OpenMAP (n=", get_n(cog_imaging_results, "Thalamus_total_openmap_seg"), ")")
+)
+
+cog_summary_table_supp_gm_wm <- cog_summary_table %>%
+  select(Domain, `SAMSEG Total GM`, `SAMSEG Cortical GM`, `SAMSEG WM`, `SAMSEG Thalamus`, `Thalamic Volume`)
+
+cog_table_for_viewing_supp_gm_wm <- kable(cog_summary_table_supp_gm_wm,
+      col.names = col_names_supp_gm_wm,
+      caption = "SUPPLEMENT: SAMSEG GM/WM volumes and thalamic volume (SAMSEG and OpenMAP-T1), each adjusted for age, sex, and SAMSEG intracranial volume. Overall cognition (Mean Accuracy / Mean RT, not part of the domain FDR family, no significance marking) plus cognitive domains (FDR-corrected within each imaging measure, * = FDR p &lt; 0.05): T(p), d=Cohen's d",
+      align = c("l", rep("c", 5))) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+cog_table_for_viewing_supp_gm_wm
+
+kableExtra::save_kable(cog_table_for_viewing_supp_gm_wm, file = paste0(homedir, "results/Table2_supp_samseg_gm_wm_thalamus.png"))
+cog_summary_table_supp_gm_wm_export <- cog_summary_table_supp_gm_wm
+names(cog_summary_table_supp_gm_wm_export) <- col_names_supp_gm_wm
+write.csv(cog_summary_table_supp_gm_wm_export,
+          file = paste0(homedir, "results/Table2_supp_samseg_gm_wm_thalamus.csv"),
+          row.names = FALSE)
 ```
 
 
@@ -724,3 +801,269 @@ if (!is.null(supp_rt_anova$posthoc)) write.csv(supp_rt_anova$posthoc, paste0(hom
 
 
 
+
+
+
+# ============================================================
+# SENSITIVITY ANALYSIS: DROP 8 SCANS WITH IMPLAUSIBLE FAST VOLUMES
+# ============================================================
+
+**TURNED OFF 10/9/2026 (eval = FALSE):** 7 of these 8 had failed BET skull strips. FAST has been rerun on the
+HD-BET skull strips (fast_hdbet) and GM/WM/ICV now come from SAMSEG, so this workaround is no longer needed.
+Kept for the record; its old outputs (results/Table2_sensitivity_drop8_fast_outliers.*) are from the old FAST run.
+
+FAST gave 8 participants implausible tissue volumes (intracranial volume more than 3.5 robust SDs
+from the sample median: 0.25-0.87 million mm3, or 2.3-2.5 million mm3, vs a median of ~1.8 million;
+their OpenMAP-T1 thalamic volumes were normal, so the FAST segmentation failed rather than the
+brains being unusual). 7 of the 8 are on the commented-out bad_scans_native_space list from the
+6/26/2026 QC; 24554 is not on that list (and 24500, who is on the list, has normal FAST volumes, so
+is kept here). Checked 10/7/2026. Their lesion values were all within the range of the rest of the
+sample.
+
+This re-runs the full Table 2 (domains + overall rows) with those 8 people removed from the 3T
+imaging analyses (GM/WM/thalamic volume, lesions). The PRL columns keep everyone (2 of the 8 are in
+the 7T PRL sample, but their 7T scans are not affected by the FAST failure), so the PRL columns are
+the same as the main Table 2. Same models, covariates (age, sex, + ICV for GM/WM/CSF/thalamus) and FDR families as the
+main analysis.
+```{r sensitivity_drop_fast_outliers, eval = FALSE}
+fast_outlier_bblids <- c(24101, 24313, 24693, 24554, 24238, 24366, 60509, 24305)
+
+cog_domains_imaging_sens <- cog_domains_imaging %>% filter(!bblid %in% fast_outlier_bblids)
+# PRL: everyone kept (7T scans unaffected by the FAST failure) -- PRL results below are the main ones
+cat("Dropped from the 3T imaging sample:", sum(fast_outlier_bblids %in% cog_domains_imaging$bblid[!is.na(cog_domains_imaging$gm_volume)]),
+    " | PRL sample unchanged:", nrow(prl_with_cnb), "\n")
+
+# run_item_imaging_lm gives the same results as the hand-rolled cog_imaging_results block above
+# (checked 10/7/2026), so it is used here for the 3T models
+cog_imaging_results_sens     <- run_item_imaging_lm(cog_outcomes, imaging_predictors, cog_domains_imaging_sens,
+                                                    icv_covariate_predictors = icv_covariate_predictors, icv_column = icv_column)
+overall_imaging_results_sens <- run_item_imaging_lm(c("mean_acc_z", "mean_rt_z"), imaging_predictors, cog_domains_imaging_sens,
+                                                    icv_covariate_predictors = icv_covariate_predictors, icv_column = icv_column)
+
+# same simplified layout as Table 2: overall rows (no stars, not in the FDR family) then the 8 domains
+sens_cols <- list(`GM Volume`       = list(cog_imaging_results_sens, overall_imaging_results_sens, "gm_volume"),
+                  `WM Volume`       = list(cog_imaging_results_sens, overall_imaging_results_sens, "wm_volume"),
+                  `Thalamic Volume` = list(cog_imaging_results_sens, overall_imaging_results_sens, "Thalamus_total_openmap_seg"),
+                  `Lesion Count`    = list(cog_imaging_results_sens, overall_imaging_results_sens, "lesion_count"),
+                  `Lesion Volume`   = list(cog_imaging_results_sens, overall_imaging_results_sens, "volume_of_mimosa_lesions"),
+                  `PRL Count`       = list(prl_domain_results,       overall_prl_results,          "prl.count"),
+                  `PRL Volume`      = list(prl_domain_results,       overall_prl_results,          "prl.volume..mm3."))   # PRL: full sample, same as main
+
+sens_overall_rows <- tibble(outcome = names(overall_labels), Domain = overall_labels)
+sens_domain_rows  <- tibble(outcome = names(domain_labels),  Domain = domain_labels)
+for (col in names(sens_cols)) {
+  sens_overall_rows <- sens_overall_rows %>% left_join(make_col_nostar(sens_cols[[col]][[2]], sens_cols[[col]][[3]]), by = "outcome") %>% dplyr::rename(!!col := cell)
+  sens_domain_rows  <- sens_domain_rows  %>% left_join(make_col(sens_cols[[col]][[1]], sens_cols[[col]][[3]]),         by = "outcome") %>% dplyr::rename(!!col := cell)
+}
+cog_summary_table_sens <- bind_rows(sens_overall_rows, sens_domain_rows) %>% select(-outcome)
+
+col_names_sens <- c("Domain", paste0(c("GM Volume", "WM Volume", "Thalamic Volume", "WM Lesion Count", "WM Lesion Volume", "PRL Count", "PRL Volume"),
+                                     " (n=", map_dbl(sens_cols, ~ get_n(.x[[1]], .x[[3]])), ")"))
+
+cog_table_for_viewing_sens <- kable(cog_summary_table_sens,
+      col.names = col_names_sens,
+      caption = "SENSITIVITY: 8 participants with implausible FAST volumes removed from the 3T imaging columns (PRL columns unchanged, full 7T sample). Overall cognition (Mean Accuracy / Mean RT, not part of the domain FDR family, no significance marking) plus cognitive domains (FDR-corrected within each imaging measure, * = FDR p &lt; 0.05) by imaging measures: T(p), d=Cohen's d",
+      align = c("l", rep("c", 7))) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+cog_table_for_viewing_sens
+
+kableExtra::save_kable(cog_table_for_viewing_sens, file = paste0(homedir, "results/Table2_sensitivity_drop8_fast_outliers.png"))
+cog_summary_table_sens_export <- cog_summary_table_sens
+names(cog_summary_table_sens_export) <- col_names_sens
+write.csv(cog_summary_table_sens_export,
+          file = paste0(homedir, "results/Table2_sensitivity_drop8_fast_outliers.csv"),
+          row.names = FALSE)
+```
+
+
+
+# ============================================================
+# SENSITIVITY ANALYSIS: OPENMAP-T1 VOLUMES (EVERYONE KEPT)
+# ============================================================
+
+**TURNED OFF 10/9/2026 (eval = FALSE):** this used OpenMAP TBV as a stand-in head-size covariate because there
+was no valid ICV. SAMSEG now gives a true ICV, and OpenMAP GM/WM adjusted for it are in the method-comparison
+section below. Kept for the record; its old outputs (results/Table2_sensitivity_openmap_volumes_tbv_covariate.*)
+are from before the reprocessing.
+
+Second way around the FAST problem: instead of dropping the 8 scans, take GM and WM volume from
+OpenMAP-T1 (which segmented all of them sensibly -- see the *_total_openmap_seg columns added in the
+merge script, label -> tissue mapping in data/openmap_t1_label_tissue_classes.csv), so every 3T
+participant stays in (n=100).
+- GM / WM / thalamic volume: OpenMAP-T1, adjusted for age, sex, and TBV.
+- TBV (total brain volume) = OpenMAP GM + WM + brainstem (no CSF/ventricles), used ONLY as the size
+  covariate in place of ICV (there is no valid ICV -- FAST ICV is broken for the 8). TBV shrinks with
+  atrophy, so adjusting for it removes global atrophy: GM/WM/thalamus effects are relative to overall
+  brain size (e.g. GM adjusted for TBV ~ GM fraction of the brain), not absolute volume.
+- Lesion and PRL columns are unchanged from the main Table 2.
+```{r sensitivity_openmap_volumes, eval = FALSE}
+cog_domains_imaging_om <- cog_domains_imaging %>%
+  mutate(TBV_openmap_seg = GM_total_openmap_seg + WM_total_openmap_seg + Brainstem_total_openmap_seg) %>%
+  # same native-space QC rule as the main analysis (bad_scans_native_space is currently empty)
+  mutate(across(c(GM_total_openmap_seg, WM_total_openmap_seg, TBV_openmap_seg),
+                ~ ifelse(bad_scans_native_space != 0, NA_real_, .)))
+
+om_predictors     <- c("GM_total_openmap_seg", "WM_total_openmap_seg", "Thalamus_total_openmap_seg")
+om_icv_predictors <- om_predictors      # all three get the size covariate
+om_head_size      <- "TBV_openmap_seg"   # TBV as the size covariate (not a predictor)
+
+cog_imaging_results_om     <- run_item_imaging_lm(cog_outcomes, om_predictors, cog_domains_imaging_om,
+                                                  icv_covariate_predictors = om_icv_predictors, icv_column = om_head_size)
+overall_imaging_results_om <- run_item_imaging_lm(c("mean_acc_z", "mean_rt_z"), om_predictors, cog_domains_imaging_om,
+                                                  icv_covariate_predictors = om_icv_predictors, icv_column = om_head_size)
+
+# same layout as Table 2; lesion/PRL columns come from the main results
+om_cols <- list(`GM Volume`       = list(cog_imaging_results_om, overall_imaging_results_om, "GM_total_openmap_seg"),
+                `WM Volume`       = list(cog_imaging_results_om, overall_imaging_results_om, "WM_total_openmap_seg"),
+                `Thalamic Volume` = list(cog_imaging_results_om, overall_imaging_results_om, "Thalamus_total_openmap_seg"),
+                `Lesion Count`    = list(cog_imaging_results,    overall_imaging_results,    "lesion_count"),
+                `Lesion Volume`   = list(cog_imaging_results,    overall_imaging_results,    "volume_of_mimosa_lesions"),
+                `PRL Count`       = list(prl_domain_results,     overall_prl_results,        "prl.count"),
+                `PRL Volume`      = list(prl_domain_results,     overall_prl_results,        "prl.volume..mm3."))
+
+om_overall_rows <- tibble(outcome = names(overall_labels), Domain = overall_labels)
+om_domain_rows  <- tibble(outcome = names(domain_labels),  Domain = domain_labels)
+for (col in names(om_cols)) {
+  om_overall_rows <- om_overall_rows %>% left_join(make_col_nostar(om_cols[[col]][[2]], om_cols[[col]][[3]]), by = "outcome") %>% dplyr::rename(!!col := cell)
+  om_domain_rows  <- om_domain_rows  %>% left_join(make_col(om_cols[[col]][[1]], om_cols[[col]][[3]]),         by = "outcome") %>% dplyr::rename(!!col := cell)
+}
+cog_summary_table_om <- bind_rows(om_overall_rows, om_domain_rows) %>% select(-outcome)
+
+col_names_om <- c("Domain", paste0(c("GM Volume", "WM Volume", "Thalamic Volume", "WM Lesion Count", "WM Lesion Volume", "PRL Count", "PRL Volume"),
+                                   " (n=", map_dbl(om_cols, ~ get_n(.x[[1]], .x[[3]])), ")"))
+
+cog_table_for_viewing_om <- kable(cog_summary_table_om,
+      col.names = col_names_om,
+      caption = "SENSITIVITY: OpenMAP-T1 GM/WM/thalamic volume adjusted for age, sex, and OpenMAP total brain volume (TBV = GM+WM+brainstem) in place of ICV, all 3T participants kept. Lesion and PRL columns as in the main table. Overall cognition (Mean Accuracy / Mean RT, not part of the domain FDR family, no significance marking) plus cognitive domains (FDR-corrected within each imaging measure, * = FDR p &lt; 0.05): T(p), d=Cohen's d",
+      align = c("l", rep("c", 7))) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+cog_table_for_viewing_om
+
+kableExtra::save_kable(cog_table_for_viewing_om, file = paste0(homedir, "results/Table2_sensitivity_openmap_volumes_tbv_covariate.png"))
+cog_summary_table_om_export <- cog_summary_table_om
+names(cog_summary_table_om_export) <- col_names_om
+write.csv(cog_summary_table_om_export,
+          file = paste0(homedir, "results/Table2_sensitivity_openmap_volumes_tbv_covariate.csv"),
+          row.names = FALSE)
+```
+
+
+
+# ============================================================
+# SEGMENTATION METHOD COMPARISON: FAST vs SAMSEG vs OpenMAP-T1 (added 10/9/2026)
+# ============================================================
+
+Three tools segmented the same 3T T1s (full-CNB sample):
+- **FAST** (FSL) -- rerun 10/9/2026 on the HD-BET skull strips, partial-volume-weighted volumes. Not lesion-filled,
+  so T1-dark lesions can be called GM.
+- **SAMSEG** (FreeSurfer 7.4.1, T1-only) -- main GM/WM/ICV measure. T1 lesions (WM-hypointensities) counted as WM.
+- **OpenMAP-T1** -- main thalamus measure; GM/WM totals from its 280 labels (data/openmap_t1_label_tissue_classes.csv).
+
+Part 1 re-runs the Table 2 models with GM/WM/thalamus from each tool, every one adjusted for age, sex, and the
+same SAMSEG ICV, so any difference between columns comes from the segmentation, not the covariate.
+Part 2 compares the volumes themselves: correlation (do the tools rank people the same way?) and Bland-Altman
+(do they agree on absolute size, and does the difference depend on brain size?). Part 3 checks whether FAST GM
+runs high in people with more lesions (no lesion filling).
+```{r method_comparison_table}
+# ---- Part 1: Table 2 models by segmentation method ----
+method_predictors <- c(gm_volume = "GM, FAST", GM_total_openmap_seg = "GM, OpenMAP", samseg_gm_total = "GM, SAMSEG",
+                       wm_volume = "WM, FAST", WM_total_openmap_seg = "WM, OpenMAP", samseg_wm_total = "WM, SAMSEG",
+                       Thalamus_total_openmap_seg = "Thalamus, OpenMAP", samseg_thalamus_total = "Thalamus, SAMSEG")
+
+cog_imaging_results_methods     <- run_item_imaging_lm(cog_outcomes, names(method_predictors), cog_domains_imaging,
+                                                       icv_covariate_predictors = names(method_predictors), icv_column = icv_column)
+overall_imaging_results_methods <- run_item_imaging_lm(c("mean_acc_z", "mean_rt_z"), names(method_predictors), cog_domains_imaging,
+                                                       icv_covariate_predictors = names(method_predictors), icv_column = icv_column)
+
+methods_overall_rows <- tibble(outcome = names(overall_labels), Domain = overall_labels)
+methods_domain_rows  <- tibble(outcome = names(domain_labels),  Domain = domain_labels)
+for (p in names(method_predictors)) {
+  methods_overall_rows <- methods_overall_rows %>% left_join(make_col_nostar(overall_imaging_results_methods, p), by = "outcome") %>% dplyr::rename(!!method_predictors[[p]] := cell)
+  methods_domain_rows  <- methods_domain_rows  %>% left_join(make_col(cog_imaging_results_methods, p),             by = "outcome") %>% dplyr::rename(!!method_predictors[[p]] := cell)
+}
+cog_summary_table_methods <- bind_rows(methods_overall_rows, methods_domain_rows) %>% select(-outcome)
+
+col_names_methods <- c("Domain", paste0(method_predictors, " (n=", map_dbl(names(method_predictors), ~ get_n(cog_imaging_results_methods, .x)), ")"))
+
+cog_table_for_viewing_methods <- kable(cog_summary_table_methods,
+      col.names = col_names_methods,
+      caption = "SUPPLEMENT: GM, WM, and thalamic volume from each segmentation tool (FAST, OpenMAP-T1, SAMSEG), each adjusted for age, sex, and SAMSEG intracranial volume. Overall cognition (Mean Accuracy / Mean RT, not part of the domain FDR family, no significance marking) plus cognitive domains (FDR-corrected within each imaging measure, * = FDR p &lt; 0.05): T(p), d=Cohen's d",
+      align = c("l", rep("c", length(method_predictors)))) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+cog_table_for_viewing_methods
+
+kableExtra::save_kable(cog_table_for_viewing_methods, file = paste0(homedir, "results/Table2_supp_by_segmentation_method.png"))
+cog_summary_table_methods_export <- cog_summary_table_methods
+names(cog_summary_table_methods_export) <- col_names_methods
+write.csv(cog_summary_table_methods_export,
+          file = paste0(homedir, "results/Table2_supp_by_segmentation_method.csv"),
+          row.names = FALSE)
+```
+
+```{r method_comparison_agreement, fig.width = 12, fig.height = 8}
+# ---- Part 2: agreement between the tools' volumes ----
+# head size: FAST "ICV" = CSF+GM+WM inside the brain mask; OpenMAP AllLabels = brain + ventricles (shrinks with
+# atrophy); SAMSEG ICV = true ICV. These are NOT the same quantity, so expect high r but large mean differences
+method_pairs <- tribble(
+  ~measure,     ~a_col,                       ~a_name,   ~b_col,                   ~b_name,
+  "GM",         "gm_volume",                  "FAST",    "samseg_gm_total",        "SAMSEG",
+  "GM",         "GM_total_openmap_seg",       "OpenMAP", "samseg_gm_total",        "SAMSEG",
+  "GM",         "gm_volume",                  "FAST",    "GM_total_openmap_seg",   "OpenMAP",
+  "WM",         "wm_volume",                  "FAST",    "samseg_wm_total",        "SAMSEG",
+  "WM",         "WM_total_openmap_seg",       "OpenMAP", "samseg_wm_total",        "SAMSEG",
+  "WM",         "wm_volume",                  "FAST",    "WM_total_openmap_seg",   "OpenMAP",
+  "Head size",  "intracranial_volume",        "FAST",    "samseg_icv",             "SAMSEG",
+  "Head size",  "AllLabels_total_openmap_seg","OpenMAP", "samseg_icv",             "SAMSEG",
+  "Thalamus",   "Thalamus_total_openmap_seg", "OpenMAP", "samseg_thalamus_total",  "SAMSEG"
+)
+
+agreement <- pmap_dfr(method_pairs, function(measure, a_col, a_name, b_col, b_name) {
+  d <- cog_domains_imaging %>% select(bblid, a = all_of(a_col), b = all_of(b_col)) %>% na.omit()
+  diff <- d$b - d$a
+  loa  <- mean(diff) + c(-1.96, 1.96) * sd(diff)
+  tibble(measure, comparison = paste(b_name, "vs", a_name), n = nrow(d),
+         r = cor(d$a, d$b), mean_a = mean(d$a), mean_b = mean(d$b),
+         mean_diff = mean(diff), pct_diff = 100 * mean(diff) / mean(d$a),
+         loa_low = loa[1], loa_high = loa[2],
+         #does the difference grow with size? (slope of difference on the pair mean)
+         prop_bias_p = summary(lm(diff ~ I((d$a + d$b) / 2)))$coefficients[2, 4],
+         #people outside the limits of agreement -- worth a visual QC
+         outside_loa = paste(d$bblid[diff < loa[1] | diff > loa[2]], collapse = " "))
+})
+agreement %>%
+  mutate(across(c(mean_a, mean_b, mean_diff, loa_low, loa_high), round), across(c(r, pct_diff), ~ round(.x, 2)),
+         prop_bias_p = signif(prop_bias_p, 2)) %>%
+  kable(caption = "Agreement between segmentation tools (full-CNB 3T sample). Volumes in mm3; mean_diff = second tool minus first; LoA = Bland-Altman 95% limits of agreement; prop_bias_p = slope of the difference on the pair mean (proportional bias); outside_loa = bblids outside the limits") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+write.csv(agreement, paste0(homedir, "results/supp_segmentation_method_agreement.csv"), row.names = FALSE)
+
+# Bland-Altman plots: x = mean of the two tools, y = difference (second minus first), lines = mean difference and 95% LoA
+ba_plot <- function(measure, a_col, a_name, b_col, b_name) {
+  d <- cog_domains_imaging %>% select(a = all_of(a_col), b = all_of(b_col)) %>% na.omit() %>%
+    mutate(avg = (a + b) / 2 / 1000, diff = (b - a) / 1000)   # cm3
+  m <- mean(d$diff); s <- sd(d$diff)
+  ggplot(d, aes(avg, diff)) +
+    geom_point(alpha = 0.6) +
+    geom_hline(yintercept = m) +
+    geom_hline(yintercept = m + c(-1.96, 1.96) * s, linetype = "dashed") +
+    labs(title = paste0(measure, ": ", b_name, " vs ", a_name, " (r = ", sprintf("%.2f", cor(d$a, d$b)), ")"),
+         x = "Mean of the two (cm3)", y = paste0(b_name, " - ", a_name, " (cm3)")) +
+    theme_minimal(base_size = 10)
+}
+ba_plots <- pmap(method_pairs, ba_plot)
+ba_figure <- wrap_plots(ba_plots, ncol = 3)
+ba_figure
+ggsave(paste0(homedir, "results/supp_segmentation_method_bland_altman.png"), ba_figure, width = 12, height = 10, dpi = 300)
+```
+
+```{r method_comparison_lesion_bias}
+# ---- Part 3: does FAST GM run high in people with more lesions? ----
+# FAST had no lesion filling, so T1-dark lesions can be classified as GM. If so, FAST GM minus SAMSEG GM
+# should rise with lesion volume (log, since lesion volume is very skewed). SAMSEG puts T1 lesions in WM.
+lesion_bias <- cog_domains_imaging %>%
+  filter(!is.na(gm_volume), !is.na(samseg_gm_total), !is.na(volume_of_mimosa_lesions)) %>%
+  mutate(fast_minus_samseg_gm = gm_volume - samseg_gm_total,
+         log_lesion_volume    = log(volume_of_mimosa_lesions + 1))
+summary(lm(fast_minus_samseg_gm ~ log_lesion_volume + samseg_icv, data = lesion_bias))
+cor.test(lesion_bias$fast_minus_samseg_gm, lesion_bias$log_lesion_volume)
+```

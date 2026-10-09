@@ -21,6 +21,22 @@ resultsdir <- paste0(homedir, "results/")
 #Uses: We will be bringing together a lot of files to make a master spreadsheet that can be used across many analyses. What is really important is that we combine separately so we protect patient data, and then create a deidentified dataset to save and use in other analyses.
 #Dependencies: any R will do
 
+#CHANGE LOG
+# 10/9/2026 -- imaging reprocessing (details in lab notebook 20261009). Version before these changes:
+#              scripts/archive/make_combined_spreadsheet_for_cnb_paper_post_replication_full_cnb_csv_pre_reprocessing_20261009.Rmd
+#              (its inputs/outputs are in data/before_20261009/)
+#   - bblid 24253 (EMPI REDACTED_ID): their T1 was a duplicate of another person's scan. Real 2023 T1 recovered,
+#     everything rerun (HD-BET, MIMOSA, lesion count/volume, FAST, OpenMAP, SAMSEG, registration, fascicles)
+#   - bblid 24530 (EMPI REDACTED_ID): T1 recovered (filed under a different accession number) -> now has
+#     FAST/OpenMAP/SAMSEG. Their FLAIR has the wrong dimensions, so still no lesion/fascicle data
+#   - lesion volume: new file mimosa_volume_values_n105_20261009_155717.csv (lesion count file has the same name)
+#   - FAST: total_fast_brain_volumes_hdbet_n105.csv -- rerun on the HD-BET skull strips with partial-volume-
+#     weighted volumes. The old total_fast_brain_volumes_n104.csv used the failed BET strips for ~9 scans and
+#     overcounted every tissue
+#   - NEW: SAMSEG volumes (samseg_volumes_n105_from_samseg_t1.csv) -- real ICV plus total GM, cortical GM,
+#     total WM and thalamus (see the SAMSEG chunk for the definitions). Planned main GM/WM/ICV measures
+#   - structural n goes 100 -> 101 (full CNB) with 24530; lesion n unchanged
+
 
 ## Demos from Oracle
 ```{r}
@@ -74,7 +90,7 @@ stopifnot(sum(cnb_data$test_sessions.subid == "60637" & cnb_data$test_sessions_v
 # Manually changing gender of one subject because cnb download is not updating our change (Oracle has Female)
 cnb_data$test_sessions_v.gender[cnb_data$test_sessions.subid == "24770"] <- "F"
 
-rownames(cnb_data) <- NULL #n=169 rows (159 people + 10 repeat visits)
+rownames(cnb_data) <- NULL #n=170 rows (160 people + 10 repeat visits)
 
 names(cnb_data)[names(cnb_data) == "test_sessions.subid"] <- "bblid"
 
@@ -87,7 +103,7 @@ cnb_data <- cnb_data %>%
    group_by(bblid) %>%
    slice_min(test_sessions_v.dotest, n = 1, with_ties = FALSE) %>%
    ungroup() %>%
-   as.data.frame() #n=159
+   as.data.frame() #n=160
 
 names(cnb_data) <- gsub(x=names(cnb_data), pattern = "\\PCET_A\\.", replacement = "PCET\\.")
 
@@ -103,7 +119,7 @@ redcap_data <- read.csv(paste0(homedir, "data/MSDepressionCollecti_DATA_2026-10-
 #filter ones where scales were not complete
 redcap_data <- redcap_data %>%
   filter(scales_validation_complete != 0) %>%
-   mutate(bblid     = as.character(bblid), #n=132
+   mutate(bblid     = as.character(bblid), #n=174 rows with complete scales
          bdi_ii_16 = as.numeric(gsub("[ab]", "", bdi_ii_16)),
          bdi_ii_18 = as.numeric(gsub("[ab]", "", bdi_ii_18)),
          promis_ms_physfunc_15a_calc = rowSums(across(matches("^promis_ms_physfunc_15a_[0-9]+$"))),
@@ -120,7 +136,7 @@ redcap_data <- redcap_data %>%
   mutate(ms_dx_date = first(na.omit(msdep_dx_hx_ms_diagnosis))) %>%
   slice_min(date, n = 1, with_ties = FALSE) %>%
   ungroup() %>%
-  as.data.frame() #n=127
+  as.data.frame() #n=162
   
 ```
 
@@ -134,7 +150,8 @@ prl_data <- cnb_and_prl %>% filter(!is.na(prl.count)) #n=27
 ## Lesion volumes
 ```{r}
 #read in mimosa volume data
-lesion_volume_df <- read.csv(paste0(homedir, "data/mimosa_volume_values_n105_20260702_094134.csv"), header = T, sep = ",")
+#10/9/2026 rebuild (24253 rerun on their real T1); was mimosa_volume_values_n105_20260702_094134.csv
+lesion_volume_df <- read.csv(paste0(homedir, "data/mimosa_volume_values_n105_20261009_155717.csv"), header = T, sep = ",")
 ```
 
 ## Lesion count
@@ -146,7 +163,12 @@ lesion_count_df <- read.csv(paste0(homedir, "data/lesion_count_n104.csv"), heade
 ## fast segmentation
 ```{r}
 #read in fast data
-fast_volumes <- read.csv(paste0(homedir, "data/total_fast_brain_volumes_n104.csv"), header = T, sep = ",")
+#10/9/2026: FAST rerun on the HD-BET skull strips with partial-volume-weighted volumes (fslstats -M -V).
+#The old total_fast_brain_volumes_n104.csv used the failed BET strips for ~9 scans and overcounted every tissue.
+#Kept for comparison with SAMSEG/OpenMAP -- SAMSEG is the planned main GM/WM/ICV measure (chunk below).
+#fast_icv (CSF+GM+WM inside the brain mask) is dropped -- it is the same as intracranial_volume below
+fast_volumes <- read.csv(paste0(homedir, "data/total_fast_brain_volumes_hdbet_n105.csv"), header = T, sep = ",") %>%
+  select(-fast_icv)
 
 fast_df <- fast_volumes %>%
   mutate(intracranial_volume = csf_volume + gm_volume + wm_volume,
@@ -160,13 +182,76 @@ fast_df <- fast_volumes %>%
 #when I first ran the openmap, I had accidentally labeled empi as subject and exam data as session. I ahve changed the script but have not rerun anything. Once this is run from scratch, would just get rid of the rename line
 
 segmentations <- read.csv(paste0(homedir, "data/all_volumes_n105_from_openmap_t1.csv"), header = T, sep = ",") #n=105
-segmentations <- rename(segmentations, "EMPI" = "subject", "EXAM_DATE" = "session") ###CHANGE THIS ONCE THIS IS RERUN WITH NEW SCRIPT
+#older per-subject files say subject/session; only rename if they are still there, so this keeps working once
+#everything has been rerun with the new script (which writes EMPI/EXAM_DATE)
+names(segmentations)[names(segmentations) == "subject"] <- "EMPI"
+names(segmentations)[names(segmentations) == "session"] <- "EXAM_DATE"
+stopifnot(all(c("EMPI", "EXAM_DATE") %in% names(segmentations)))
 segmentations$Thalamus_total <- (segmentations$Thalamus_L + segmentations$Thalamus_R)
+
+# whole-brain tissue volumes from OpenMAP-T1 (added 10/7/2026). FAST failed on ~9 scans (ICV 0.25-2.5
+# million mm3, mostly the 8 on the commented-out bad_scans_native_space list) while OpenMAP gave all of
+# them normal totals, and in the good scans OpenMAP GM/WM track FAST closely (r = 0.92/0.85).
+# Which label counts as which tissue is in data/openmap_t1_label_tissue_classes.csv (edit there, not here).
+#   GM_total        -- cortical gyri, deep GM nuclei, cerebellar GM
+#   WM_total        -- deep/periventricular/superficial WM, cerebellar WM, fornix/fimbria, peduncles
+#   CSF_total       -- ventricles + labeled sulcal CSF ONLY (most extracerebral CSF is not labeled)
+#   Brainstem_total -- midbrain/pons/medulla, mixed tissue, kept separate
+#   AllLabels_total -- every label; brain + ventricles, NOT a true ICV (it shrinks with atrophy), so as
+#                      a head-size covariate it also removes some atrophy -- stand-in until a real ICV exists
+openmap_tissue_classes <- read.csv(paste0(homedir, "data/openmap_t1_label_tissue_classes.csv"), header = TRUE)
+#every label column must be classified exactly once, or the totals silently miss something
+stopifnot(setequal(openmap_tissue_classes$r_column_name,
+                   setdiff(names(segmentations), c("EMPI", "EXAM_DATE", "Thalamus_total"))))
+sum_tissue <- function(tissue) rowSums(segmentations[, openmap_tissue_classes$r_column_name[openmap_tissue_classes$tissue_class == tissue], drop = FALSE])
+segmentations$GM_total        <- sum_tissue("GM")
+segmentations$WM_total        <- sum_tissue("WM")
+segmentations$CSF_total       <- sum_tissue("CSF")
+segmentations$Brainstem_total <- sum_tissue("brainstem")
+segmentations$AllLabels_total <- rowSums(segmentations[, openmap_tissue_classes$r_column_name])
 
 
 names(segmentations) <- ifelse(names(segmentations) %in% c("EMPI", "EXAM_DATE"),
                                 names(segmentations),
                                 paste0(names(segmentations), "_openmap_seg"))
+```
+
+## SAMSEG volumes
+```{r samseg}
+#added 10/9/2026. SAMSEG (FreeSurfer 7.4.1 container, T1-only run) gives a real ICV -- brain plus ALL intracranial
+#CSF, unlike FAST CSF+GM+WM (only CSF inside the brain mask) or OpenMAP AllLabels (shrinks with atrophy).
+#Needed because GM/WM differ by sex, so they need a true head-size covariate.
+#Definitions follow the usual MS convention (agreed 10/9/2026): whole-brain GM includes deep GM; T1 lesions
+#(WM-hypointensities) count as WM, which is what lesion filling does; brainstem is in neither
+#   samseg_gm_total       -- cerebral + cerebellar cortex, thalamus, caudate, putamen, pallidum, hippocampus,
+#                            amygdala, accumbens, ventral DC (both sides)
+#   samseg_cortical_gm    -- cerebral cortex only (both sides)
+#   samseg_wm_total       -- cerebral + cerebellar WM (both sides) + WM-hypointensities
+#   samseg_thalamus_total -- left + right thalamus (to compare with the OpenMAP thalamus, still the main one)
+#   samseg_icv            -- SAMSEG's sbTIV
+#check.names = FALSE keeps SAMSEG's own structure names ("Left-Cerebral-Cortex") instead of R's dotted version
+samseg <- read.csv(paste0(homedir, "data/samseg_volumes_n105_from_samseg_t1.csv"), header = TRUE, check.names = FALSE)
+
+both_sides <- function(structures) c(paste0("Left-", structures), paste0("Right-", structures))
+samseg_gm_structures  <- both_sides(c("Cerebral-Cortex", "Cerebellum-Cortex", "Thalamus", "Caudate", "Putamen",
+                                      "Pallidum", "Hippocampus", "Amygdala", "Accumbens-area", "VentralDC"))
+samseg_ctx_structures <- both_sides("Cerebral-Cortex")
+samseg_wm_structures  <- c(both_sides(c("Cerebral-White-Matter", "Cerebellum-White-Matter")), "WM-hypointensities")
+samseg_thal_structures <- both_sides("Thalamus")
+
+#stop if a structure name is misspelled or SAMSEG changes its labels -- otherwise rowSums would quietly miss it
+stopifnot(all(c(samseg_gm_structures, samseg_wm_structures, "samseg_icv") %in% names(samseg)))
+
+samseg_df <- data.frame(
+  EMPI                  = samseg$EMPI,
+  EXAM_DATE             = samseg$EXAM_DATE,
+  samseg_icv            = samseg$samseg_icv,
+  samseg_gm_total       = rowSums(samseg[, samseg_gm_structures]),
+  samseg_cortical_gm    = rowSums(samseg[, samseg_ctx_structures]),
+  samseg_wm_total       = rowSums(samseg[, samseg_wm_structures]),
+  samseg_thalamus_total = rowSums(samseg[, samseg_thal_structures])
+)
+summary(samseg_df[, -(1:2)])
 ```
 
 ## Conversion files (MRN->EMPI, MRN-> BBLID
@@ -209,8 +294,8 @@ mrn_empi_bblid <- mrn_empi_bblid_merged %>% select(EMPI, MRN_clean, bblid)
 ## Combine behavioral data
 ```{r}
 #demo_cnb_data <- cnb_data # keeping this way while I sort out the merging issuemerge(demographics, cnb_data, by = "bblid", all = TRUE) #n=137
-demo_cnb_data <- merge(demographics, cnb_data, by = "bblid", all = TRUE) #n=150 - keep all rows
-demo_cnb_redcap_data <- merge(demo_cnb_data, redcap_data, by = "bblid", all = TRUE) #n=151 - keep all rows
+demo_cnb_data <- merge(demographics, cnb_data, by = "bblid", all = TRUE) #n=162 - keep all rows
+demo_cnb_redcap_data <- merge(demo_cnb_data, redcap_data, by = "bblid", all = TRUE) #n=163 - keep all rows
 #all.x = TRUE so people who took the CNB but aren't in the mrn/empi mapping files yet (mostly newer
 #participants tested after the radiology pull) are kept -- they just have NA MRN/EMPI, so no imaging/PRL
 all_behavioral_data <- merge(demo_cnb_redcap_data, mrn_empi_bblid, by = "bblid", all.x = TRUE)
@@ -220,14 +305,14 @@ names(all_behavioral_data)[names(all_behavioral_data) == "MRN_clean"] <- "MRN"
 # completed CNB session, so this catches people who have demographics/imaging but never
 # took the CNB battery (e.g. bblid 11117), who the all=TRUE merges above kept around
 all_behavioral_data <- all_behavioral_data %>%
-  filter(!is.na(test_sessions_v.dotest)) #n=161
+  filter(!is.na(test_sessions_v.dotest)) #n=160
 
 # keep only people who are in all three behavioral sources -- CNB (above), the Oracle demographics pull,
 # and redcap (scales_validation_complete != 0). The all=TRUE merges above keep people who are missing
 # one of them, which leaves NA sex/race/DMT (no Oracle) or NA mood scales (no redcap)
 all_behavioral_data <- all_behavioral_data %>%
   filter(bblid %in% demographics$bblid,
-         bblid %in% redcap_data$bblid)
+         bblid %in% redcap_data$bblid) #n=159 (26066 has no redcap)
 
 # years since MS diagnosis, counted from the date of the study (CNB session) -- NA if no redcap dx date
 all_behavioral_data <- all_behavioral_data %>%
@@ -241,22 +326,34 @@ all_behavioral_data <- all_behavioral_data %>%
   #select(bblid, prl.count, prl.volume..mm3., COMPLETED.CNB., DATE.COMPLETED.CNB, Closest.7T.scan)
 
 prl_data$MRN <- str_remove(as.character(prl_data$MRN), "^0+")
-cnb_redcap_prl_data <- merge(all_behavioral_data, prl_data, by = "MRN", all.x = TRUE)  #n=121
+cnb_redcap_prl_data <- merge(all_behavioral_data, prl_data, by = "MRN", all.x = TRUE)  #n=159
 
 ```
 
 ## Combine imaging data (mimosa volumes, counts, segmentations) with rest of data
 ```{r}
-cnb_prl_lesion_data <- merge(cnb_redcap_prl_data, lesion_volume_df, by = "EMPI", all.x = TRUE) #n=121
+#scan date (EXAM_DATE) for everyone with a 3T T1, taken from SAMSEG, which has one row per T1 in the radiology
+#pull (n=105). Fixed 10/9/2026: EXAM_DATE used to come from the lesion volume file, so anyone with a T1 but no
+#MIMOSA lesion map (no usable FLAIR -- 24530) also lost their FAST/OpenMAP/SAMSEG volumes in the merges below
+scan_dates <- samseg_df[, c("EMPI", "EXAM_DATE")]
+stopifnot(!any(duplicated(scan_dates$EMPI))) #one scan per person, so merging on EMPI can't duplicate rows
+cnb_prl_scan_data <- merge(cnb_redcap_prl_data, scan_dates, by = "EMPI", all.x = TRUE) #n=159
+
+cnb_prl_lesion_data <- merge(cnb_prl_scan_data, lesion_volume_df, by = c("EMPI", "EXAM_DATE"), all.x = TRUE) #n=159
+stopifnot(nrow(cnb_prl_lesion_data) == nrow(cnb_redcap_prl_data))
 
 # merge on EMPI + EXAM_DATE (not just EMPI) since fast_df also carries its own EXAM_DATE
 # column -- merging on EMPI alone would silently rename both to EXAM_DATE.x/EXAM_DATE.y
 # instead of keeping a single column for the later segmentations merge to key on
-cnb_prl_lesion_volumes_data <- merge(cnb_prl_lesion_data, fast_df, by = c("EMPI", "EXAM_DATE"), all.x = TRUE) #n=121
+cnb_prl_lesion_volumes_data <- merge(cnb_prl_lesion_data, fast_df, by = c("EMPI", "EXAM_DATE"), all.x = TRUE) #n=159
 
-cnb_prl_lesion_volumes_counts_data <- merge(cnb_prl_lesion_volumes_data, lesion_count_df, by = "EMPI", all.x = TRUE) #n=121
+cnb_prl_lesion_volumes_counts_data <- merge(cnb_prl_lesion_volumes_data, lesion_count_df, by = "EMPI", all.x = TRUE) #n=159
 
-cnb_prl_lesion_volumes_segs_data <- merge(cnb_prl_lesion_volumes_counts_data, segmentations, by = c("EMPI", "EXAM_DATE"), all.x = TRUE) #n=121
+cnb_prl_lesion_volumes_segs_data <- merge(cnb_prl_lesion_volumes_counts_data, segmentations, by = c("EMPI", "EXAM_DATE"), all.x = TRUE) #n=159
+
+#SAMSEG (added 10/9/2026)
+cnb_prl_lesion_volumes_segs_data <- merge(cnb_prl_lesion_volumes_segs_data, samseg_df, by = c("EMPI", "EXAM_DATE"), all.x = TRUE) #n=159
+stopifnot(nrow(cnb_prl_lesion_volumes_segs_data) == nrow(cnb_prl_lesion_volumes_counts_data))
 
 #make thalamus by ICV column
 cnb_prl_lesion_volumes_segs_data$Thalamus_total_by_icv <- cnb_prl_lesion_volumes_segs_data$Thalamus_total_openmap_seg/cnb_prl_lesion_volumes_segs_data$intracranial_volume
@@ -288,11 +385,11 @@ combined_final$bad_warps <- ifelse(combined_final$EMPI %in% bad_warps, 1, 0)
 #Full CNB flag
  - full_cnb = 1 if the participant has every raw CNB column that feeds the 8 domain scores
    (11 tasks x acc/RT = 22 columns), 0 otherwise. Same people as the "Full-CNB Subsample"
-   section of cnb_lesion_structural_prl_final_analyses_post_replication_20260917.Rmd (n=142).
+   section of cnb_lesion_structural_prl_final_analyses_post_replication_20260917.Rmd (n=153).
  - SCTAP (finger taps acc) and MPRACT (sensorimotor RT) only feed the overall mean acc/RT,
    not a domain, so they are not part of this definition.
- - The 5 people with full_cnb = 0 (checked 10/2/2026, cnb_full_2026_10_01.csv): 24587, 60589, 24261,
-   24772, 25565. 60637 is now full (row 126 of the cnb file has every task) -- see the CNB chunk
+ - The 6 people with full_cnb = 0 (checked 10/2/2026, cnb_full_10_02_2026.csv): 24587, 60589, 24261,
+   24772, 25565, 26220 (no PMAT24 RT). 60637 is full (combined "Pending" session) -- see the CNB chunk
 ```{r full_cnb}
 full_cnb_columns <- c(
   "ER40_A.ER40_CR", "ER40_A.ER40_RTCR",
@@ -310,7 +407,7 @@ full_cnb_columns <- c(
 
 combined_final$full_cnb <- ifelse(rowSums(is.na(combined_final[full_cnb_columns])) == 0, 1, 0)
 
-cat("full_cnb == 1:", sum(combined_final$full_cnb == 1), "of", nrow(combined_final), "\n") #142 of 147
+cat("full_cnb == 1:", sum(combined_final$full_cnb == 1), "of", nrow(combined_final), "\n") #153 of 159
 cat("full_cnb == 0 (bblid):", combined_final$bblid[combined_final$full_cnb == 0], "\n")
 ```
 
@@ -347,6 +444,11 @@ cnb_paper_columns <- c(
   "total_volume", "intracranial_volume",
   # thalamic volume
   "Thalamus_total_openmap_seg", "Thalamus_total_by_icv",
+  # OpenMAP-T1 whole-brain tissue volumes (added 10/7/2026, see the segmentation chunk) -- AllLabels is NOT a true ICV
+  "GM_total_openmap_seg", "WM_total_openmap_seg", "CSF_total_openmap_seg",
+  "Brainstem_total_openmap_seg", "AllLabels_total_openmap_seg",
+  # SAMSEG (added 10/9/2026, see the SAMSEG chunk) -- samseg_icv is a true ICV
+  "samseg_icv", "samseg_gm_total", "samseg_cortical_gm", "samseg_wm_total", "samseg_thalamus_total",
   # PRL
   "prl.count", "prl.volume..mm3."
 )
@@ -359,16 +461,17 @@ write.csv(cnb_paper_deidentified, file = paste0(homedir, "data/cnb_prl_mimosa_st
 
 #De-identify
 ```{r}
-#remove MRN, EMPI, and any name columns, keep BBLID
+#remove MRN, EMPI, the PRL list's ID, and any name columns, keep BBLID
 #name columns can come in from more than one source (e.g. the PRL list carries its own, read in
 #as "X...NAME" because of a byte-order-mark), so drop by pattern rather than by exact name.
 #case-sensitive on purpose -- "NAME"/"Participant.Name" only, so meds_names_only/meds_name_and_dose stay
+#ID = 7T PRL study subject code (n=27) -- not needed (PRL merges on MRN) and links back to the 7T subject list
 name_cols <- grep("NAME|Participant\\.Name", names(combined_final), value = TRUE)
 combined_deidentified <- combined_final %>%
-  select(-MRN, -EMPI, -all_of(name_cols))
+  select(-MRN, -EMPI, -ID, -all_of(name_cols))
 
 #stop before writing if any identifier column survived
-stopifnot(!any(grepl("NAME|Participant\\.Name|^MRN|^EMPI", names(combined_deidentified))))
+stopifnot(!any(grepl("NAME|Participant\\.Name|^MRN|^EMPI|^ID$", names(combined_deidentified))))
 
 write.csv(combined_deidentified, file = paste0(homedir, "data/cnb_goa_prl_mimosa_streamline_filtering_dep_net_deid.csv"))
 ```
@@ -377,7 +480,7 @@ write.csv(combined_deidentified, file = paste0(homedir, "data/cnb_goa_prl_mimosa
 ```{r}
 # Cleans select_demos_list from above to code for sex and on_dmt variables
 # ALL demographics tables below (demo_table, Supplemental Table 1, Table1) are restricted to
-# people with a full CNB (full_cnb == 1, n=142) -- so the 3T and 7T columns are the full-CNB
+# people with a full CNB (full_cnb == 1, n=153) -- so the 3T and 7T columns are the full-CNB
 # people within those samples, not everyone with a scan
 demos_table_data <- combined_deidentified %>%
   filter(full_cnb == 1) %>%
@@ -559,7 +662,7 @@ cnb_sample <- demos_table_data %>%
  # filter(!is.na(volume_of_mimosa_lesions) & volume_of_mimosa_lesions != 0)
 
 structural_sample <- demos_table_data %>%
-  filter(!is.na(gm_volume) & !is.na(wm_volume) & !is.na(Thalamus_total_openmap_seg))
+  filter(!is.na(GM_total_openmap_seg) & !is.na(WM_total_openmap_seg) & !is.na(Thalamus_total_openmap_seg)) #OpenMAP-T1 volumes (FAST unreliable, 10/7/2026)
 
 prl_sample <- demos_table_data %>%
   filter(!is.na(prl.count))
