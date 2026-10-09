@@ -93,10 +93,11 @@ zscores_kosha_norms <- function(data_frame, norm_column_name, acc_or_rt, cnb_col
 # ============================================================
 
 run_item_imaging_lm<- function(items, img_predictors, data, exclude_zero = FALSE,
-                                icv_covariate_predictors = icv_covariate_predictors) {
+                                icv_covariate_predictors = icv_covariate_predictors,
+                                icv_column = "intracranial_volume") { # icv_column (added 10/7/2026): which head-size column to use as the ICV covariate; default = old behavior
   map(img_predictors, function(img_var) { #looks like map runs through everything and then sends to transmute that does the correction, so should be correction over all the items/scales within one imaging variable
     covariates <- c("test_sessions_v.age", "test_sessions_v.gender")
-    if (img_var %in% icv_covariate_predictors) covariates <- c(covariates, "intracranial_volume")
+    if (img_var %in% icv_covariate_predictors) covariates <- c(covariates, icv_column)
 
     tibble(outcome = items) %>%
       mutate(
