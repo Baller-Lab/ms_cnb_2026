@@ -25,9 +25,9 @@ resultsdir <- paste0(homedir, "results/")
 # 10/9/2026 -- imaging reprocessing (details in lab notebook 20261009). Version before these changes:
 #              scripts/archive/make_combined_spreadsheet_for_cnb_paper_post_replication_full_cnb_csv_pre_reprocessing_20261009.Rmd
 #              (its inputs/outputs are in data/before_20261009/)
-#   - bblid 24253 (EMPI REDACTED_ID): their T1 was a duplicate of another person's scan. Real 2023 T1 recovered,
+#   - bblid 24253: their T1 was a duplicate of another person's scan. Real 2023 T1 recovered,
 #     everything rerun (HD-BET, MIMOSA, lesion count/volume, FAST, OpenMAP, SAMSEG, registration, fascicles)
-#   - bblid 24530 (EMPI REDACTED_ID): T1 recovered (filed under a different accession number) -> now has
+#   - bblid 24530: T1 recovered (filed under a different accession number) -> now has
 #     FAST/OpenMAP/SAMSEG. Their FLAIR has the wrong dimensions, so still no lesion/fascicle data
 #   - lesion volume: new file mimosa_volume_values_n105_20261009_155717.csv (lesion count file has the same name)
 #   - FAST: total_fast_brain_volumes_hdbet_n105.csv -- rerun on the HD-BET skull strips with partial-volume-
@@ -373,12 +373,14 @@ combined_final <- cnb_prl_lesion_volumes_segs_data %>%
 ```{r qa}
 
 #scans were eyeballed 6/26/2026
-#bad_scans_native_space <- c("REDACTED_ID", "REDACTED_ID", "REDACTED_ID", "REDACTED_ID", "REDACTED_ID", "REDACTED_ID", "REDACTED_ID", "REDACTED_ID")
+#lists are by bblid (10/9/2026: were EMPIs, which can't go on GitHub -- same people, checked that the same 12
+#participants are flagged for bad_warps; 11117 is on the list but excluded from the sample)
+#bad_scans_native_space <- c("24101", "24313", "24693", "24238", "24500", "24366", "60509", "24305")
 bad_scans_native_space <- c("")
-bad_warps <- c("REDACTED_ID","REDACTED_ID","REDACTED_ID","REDACTED_ID","REDACTED_ID","REDACTED_ID","REDACTED_ID","REDACTED_ID","REDACTED_ID","REDACTED_ID","REDACTED_ID","REDACTED_ID","REDACTED_ID")
+bad_warps <- c("24607", "25441", "11117", "25458", "60577", "25442", "24692", "24521", "60513", "24367", "24395", "60565", "24657")
 
-combined_final$bad_scans_native_space <- ifelse(combined_final$EMPI %in% bad_scans_native_space, 1, 0)
-combined_final$bad_warps <- ifelse(combined_final$EMPI %in% bad_warps, 1, 0)
+combined_final$bad_scans_native_space <- ifelse(combined_final$bblid %in% bad_scans_native_space, 1, 0)
+combined_final$bad_warps <- ifelse(combined_final$bblid %in% bad_warps, 1, 0)
 
 ```
 
