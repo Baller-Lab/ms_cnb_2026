@@ -37,6 +37,8 @@ CHANGE LOG
       analyses at the end (drop 8 FAST outliers; OpenMAP + TBV) are turned off (eval = FALSE), and
       replaced by a segmentation-method comparison section (FAST vs SAMSEG vs OpenMAP)
     - 3T n is 101 (was 100): 24530's T1 was recovered
+  10/15/2026 -- + supplementary sensitivity table: log-transformed WM lesion count and volume (Table2_supp_log_lesions);
+    Table 2 itself stays raw. Previous version: scripts/archive/..._pre_log_lesion_supp_20261015.Rmd
 -->
 
 ```{r setup, include=FALSE}
@@ -709,6 +711,57 @@ names(cog_summary_table_supp_gm_wm_export) <- col_names_supp_gm_wm
 write.csv(cog_summary_table_supp_gm_wm_export,
           file = paste0(homedir, "results/Table2_supp_samseg_gm_wm_thalamus.csv"),
           row.names = FALSE)
+```
+
+## Supplementary Table: log-transformed WM lesion count and volume (sensitivity)
+
+Table 2 uses raw WM lesion count and volume. Raw lesion volume is strongly right-skewed (a few people with very
+large lesion loads), so as a sensitivity check the same models (domain ~ lesion measure + age + sex; FDR across the 8
+domains within each measure) are run with log(1 + count) and log(1 + volume). Reported in the text as a sensitivity
+analysis; Table 2 stays raw. PRL count/volume are not transformed (PRL analyses are a separate, smaller subsample).
+```{r supp_table_log_lesions}
+cog_domains_imaging_log <- cog_domains_imaging %>%
+  mutate(log_lesion_count  = log1p(lesion_count),
+         log_lesion_volume = log1p(volume_of_mimosa_lesions))
+
+skew <- function(x) { x <- x[!is.na(x)]; mean((x - mean(x))^3) / sd(x)^3 }
+cat("Skewness: lesion count raw", round(skew(cog_domains_imaging_log$lesion_count), 2),
+    "log", round(skew(cog_domains_imaging_log$log_lesion_count), 2),
+    "| lesion volume raw", round(skew(cog_domains_imaging_log$volume_of_mimosa_lesions), 2),
+    "log", round(skew(cog_domains_imaging_log$log_lesion_volume), 2), "\n")
+
+log_lesion_domain_results  <- run_item_imaging_lm(cog_outcomes, c("log_lesion_count", "log_lesion_volume"), cog_domains_imaging_log,
+                                                  icv_covariate_predictors = icv_covariate_predictors, icv_column = icv_column)
+log_lesion_overall_results <- run_item_imaging_lm(c("mean_acc_z", "mean_rt_z"), c("log_lesion_count", "log_lesion_volume"), cog_domains_imaging_log,
+                                                  icv_covariate_predictors = icv_covariate_predictors, icv_column = icv_column)
+
+col_names_supp_log <- c(
+  "Domain",
+  paste0("Lesion Count, log (n=",  get_n(log_lesion_domain_results, "log_lesion_count"), ")"),
+  paste0("Lesion Volume, log (n=", get_n(log_lesion_domain_results, "log_lesion_volume"), ")")
+)
+
+supp_log_domain_rows <- tibble(outcome = names(domain_labels)) %>%
+  mutate(Domain = domain_labels[outcome]) %>%
+  left_join(make_col(log_lesion_domain_results, "log_lesion_count"),  by = "outcome") %>% dplyr::rename(`Lesion Count (log)`  = cell) %>%
+  left_join(make_col(log_lesion_domain_results, "log_lesion_volume"), by = "outcome") %>% dplyr::rename(`Lesion Volume (log)` = cell)
+supp_log_overall_rows <- tibble(outcome = c("mean_acc_z", "mean_rt_z"), Domain = c("Mean Accuracy", "Mean RT")) %>%
+  left_join(make_col_nostar(log_lesion_overall_results, "log_lesion_count"),  by = "outcome") %>% dplyr::rename(`Lesion Count (log)`  = cell) %>%
+  left_join(make_col_nostar(log_lesion_overall_results, "log_lesion_volume"), by = "outcome") %>% dplyr::rename(`Lesion Volume (log)` = cell)
+cog_summary_table_supp_log <- bind_rows(supp_log_domain_rows, supp_log_overall_rows) %>%
+  select(Domain, `Lesion Count (log)`, `Lesion Volume (log)`)
+
+cog_table_for_viewing_supp_log <- kable(cog_summary_table_supp_log,
+      col.names = col_names_supp_log,
+      caption = "SUPPLEMENT: log-transformed WM lesion count and volume (log(1 + x)), adjusted for age and sex. Cognitive domains (FDR-corrected within each measure, * = FDR p &lt; 0.05) plus overall cognition (Mean Accuracy / Mean RT, no significance marking): T(p), d=Cohen's d",
+      align = c("l", rep("c", 2))) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+cog_table_for_viewing_supp_log
+
+kableExtra::save_kable(cog_table_for_viewing_supp_log, file = paste0(homedir, "results/Table2_supp_log_lesions.png"))
+cog_summary_table_supp_log_export <- cog_summary_table_supp_log
+names(cog_summary_table_supp_log_export) <- col_names_supp_log
+write.csv(cog_summary_table_supp_log_export, file = paste0(homedir, "results/Table2_supp_log_lesions.csv"), row.names = FALSE)
 ```
 
 
